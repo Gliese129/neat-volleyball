@@ -20,3 +20,10 @@ activation_functions = relu
 # population
 population_size = 100
 species_best_size = 20
+
+# play
+action_threshold = 0.6
+
+# others
+checkpoint_path = './checkpoint'
+checkpoint_rate = 5

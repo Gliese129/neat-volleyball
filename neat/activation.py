@@ -13,3 +13,6 @@ def relu(x: jnp.ndarray) -> jnp.ndarray:
 def softmax(x: jnp.ndarray) -> jnp.ndarray:
     e_x =  jnp.exp(x)
     return e_x / e_x.sum()
+
+def none_(x: jnp.ndarray) -> jnp.ndarray:
+    return x

@@ -1,4 +1,5 @@
-genes = []
+from neat import InnovationNumber
+
 
 class Gene:
     from_node: int
@@ -12,14 +13,9 @@ class Gene:
         self.from_node = from_node
         self.to_node = to_node
         self.weight = weight
-        if not hash(self) in genes:
-            genes.append(hash(self))
-            self.id = len(genes) - 1
-        else:
-            self.id = genes.index(hash(self))
 
-    def __hash__(self):
-        return self.from_node * 100000 + self.to_node
+        self.id = InnovationNumber.get_gene_innovation_number(from_node, to_node)
+
 
     def __str__(self):
-        return f'Edge {self.from_node} -> {self.to_node} [weight: {self.weight}]'
+        return f'Edge {self.id}:  {self.from_node} -> {self.to_node} [weight: {self.weight}]'

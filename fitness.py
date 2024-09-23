@@ -5,8 +5,10 @@ import random
 from slime_volleyball.slimevolley_env import SlimeVolleyEnv
 from slime_volleyball.baseline_policy import BaselinePolicy
 from neat.activation import softmax
+from neat.superparams import action_threshold
 
-max_step = 100
+
+max_step = 200
 
 def get_score(left: Genome, right: Genome = None) -> Tuple[float, float]:
     """
@@ -15,6 +17,8 @@ def get_score(left: Genome, right: Genome = None) -> Tuple[float, float]:
     :param right:
     :return:
     """
+
+    use_baseline = right is None
     if right is None:
         right = BaselinePolicy()  # defaults to use RNN Baseline for player
 
@@ -25,7 +29,6 @@ def get_score(left: Genome, right: Genome = None) -> Tuple[float, float]:
     left_reward, right_reward = 0, 0
 
     terminateds = truncateds = {"__all__": False}
-    print("Game start")
     while steps <= max_step and not terminateds["__all__"] and not truncateds["__all__"]:
         obs_right, obs_left = obs["agent_right"], obs["agent_left"]
 
@@ -34,19 +37,19 @@ def get_score(left: Genome, right: Genome = None) -> Tuple[float, float]:
 
         # softmax
         left_action_predict = softmax(left_action_predict)
-        right_action_predict = softmax(right_action_predict)
-
-        threshold = 0.7
         left_action = [0 for _ in range(left_action_predict.shape[0])]
-        right_action = [0 for _ in range(right_action_predict.shape[0])]
-
-
         for i in range(left_action_predict.shape[0]):
-            if left_action[i] > threshold:
+            if left_action[i] > action_threshold:
                 left_action[i] = 1
-        for i in range(right_action_predict.shape[0]):
-            if right_action[i] > threshold:
-                right_action[i] = 1
+
+        if use_baseline:
+            right_action = right_action_predict
+        else:
+            right_action_predict = softmax(right_action_predict)
+            right_action = [0 for _ in range(right_action_predict.shape[0])]
+            for i in range(right_action_predict.shape[0]):
+                if right_action[i] > action_threshold:
+                    right_action[i] = 1
 
 
         actions = {"agent_left": left_action, "agent_right": right_action}
@@ -55,7 +58,6 @@ def get_score(left: Genome, right: Genome = None) -> Tuple[float, float]:
         left_reward += reward["agent_left"]
         right_reward += reward["agent_right"]
         steps += 1
-    print(f"Game stop with left {left_reward} and right {right_reward}")
     env.close()
     # return the score of the right agent
     return left_reward, right_reward

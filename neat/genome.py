@@ -1,6 +1,8 @@
 import random
+from copy import deepcopy
 
 import jax.numpy as jnp
+import pydot
 
 from .gene import Gene
 from .node import Node
@@ -14,6 +16,10 @@ class Genome:
     depth_map: dict[int, int]
     fitness: float = 0
     adjusted_fitness: float = 0
+    output_nodes: list[Node]
+    input_nodes: list[Node]
+    generation: int
+    idx: int
 
     @property
     def cell_num(self): return len(self.nodes)
@@ -21,7 +27,7 @@ class Genome:
     def edge_num(self): return len(self.edges)
 
 
-    def __init__(self, nodes: list[Node] | dict[int, Node], edges: list[Gene] | dict[int, Gene]):
+    def __init__(self, nodes: list[Node] | dict[int, Node], edges: list[Gene] | dict[int, Gene], generation: int = None, idx: int = None):
         if isinstance(nodes, list):
             nodes = {node.node_id: node for node in nodes}
         if isinstance(edges, list):
@@ -30,6 +36,8 @@ class Genome:
         self.nodes = nodes
         self.edges = edges
         self.calculate_node_topology()
+        self.generation = generation
+        self.idx = idx
 
     def calculate_node_topology(self):
         """
@@ -38,25 +46,47 @@ class Genome:
         """
         self.topology = []
         self.depth_map = {}
+        self.input_nodes = []
+        self.output_nodes = []
         idx = 0
 
         nodes = [node for node in self.nodes.values()]
         excluded = {node.node_id: False for node in nodes}
-
         cnt = len(nodes) * 2
-        while len(nodes) > 0 and cnt > 0:
+
+        in_degree = {node.node_id: 0 for node in nodes}  # calculate the in and out degree of each node
+        out_degree = {node.node_id: 0 for node in nodes}
+        for edge in self.edges.values():
+            in_degree[edge.to_node] += 1
+            out_degree[edge.from_node] += 1
+        for node in nodes:
+            if in_degree[node.node_id] == 0:
+                self.input_nodes.append(node)
+            if out_degree[node.node_id] == 0:
+                self.output_nodes.append(node)
+
+
+        while nodes and cnt > 0:
             cnt -= 1
             self.topology.append([])
-            in_degree = [0 for _ in range(len(self.nodes))] # calculate the in and out degree of each node
+            in_degree = {node.node_id: 0 for node in nodes} # calculate the in and out degree of each node
+
+            # init from_edges
+            for node in nodes:
+                node.from_edges = []
+
             for edge in self.edges.values():
-                if excluded[edge.from_node]: continue
+                if excluded.get(edge.from_node, False):
+                    continue
                 in_degree[edge.to_node] += 1
-                self.nodes[edge.to_node].from_edges.append(edge)
+
 
             next_nodes = []
+
             # find the nodes with in_degree 0
             for node in nodes:
-                if excluded[node.node_id]: continue
+                if excluded[node.node_id]:
+                    continue
                 if in_degree[node.node_id] == 0:
                     self.topology[-1].append(node)
                     self.depth_map[node.node_id] = idx
@@ -66,6 +96,7 @@ class Genome:
             # remove the nodes with in_degree 0
             nodes = next_nodes
             idx += 1
+
         assert cnt > 0, f'The network contains a cycle {self.edges.values()}'
 
 
@@ -75,16 +106,30 @@ class Genome:
         :param x: The input
         :return: The output
         """
-        inputs = [node for node in self.topology[0]]
-        assert len(inputs) == x.shape[0], 'The input size does not match the network input size'
-        for i, node in enumerate(inputs):
+        assert len(self.input_nodes) == x.shape[0], 'The input size does not match the network input size'
+        for i, node in enumerate(self.input_nodes):
             node.x = x[i]
 
+        # init
         for layer in self.topology[1:]:
             for node in layer:
-                node.forward(self.nodes)
+                node.x = 0
 
-        x = [node.x for node in self.topology[-1]]
+        net_map = {}
+        for edge in self.edges.values():
+            if not net_map.get(edge.from_node, False):
+                net_map[edge.from_node] = list()
+            net_map[edge.from_node].append(edge)
+
+        # forward
+        for layer in self.topology:
+            for node in layer:
+                for edge in net_map.get(node.node_id, []):
+                    to_node = self.nodes[edge.to_node]
+                    to_node.x += node.x * edge.weight
+
+
+        x = [node.x for node in self.output_nodes]
         return jnp.array(x)
 
     def distance(self, another: 'Genome'):
@@ -124,26 +169,43 @@ class Genome:
         :return: A new network
         """
         # nodes should be the union of the two parents
-        nodes = {**parent1.nodes, **parent2.nodes}
-        #
         edges = {}
-        max_edge_id = max(parent1.edges.keys() | parent2.edges.keys()) + 1
+        nodes_needed = set()
+
+        all_edge_ids = set(parent1.edges.keys()).union(parent2.edges.keys())
+
         # calculate mismatched edges
-        for i in range(max_edge_id):
-            edge1 = parent1.edges.get(i)
-            edge2 = parent2.edges.get(i)
-            if edge1 is not None and edge2 is not None:
-                edges[i] = random.choice([edge1, edge2])
+        for edge_id in all_edge_ids:
+            edge1 = parent1.edges.get(edge_id)
+            edge2 = parent2.edges.get(edge_id)
+
+            if edge1 and edge2:
+                chosen_edge = random.choice([edge1, edge2])
+            elif edge1:
+                chosen_edge = edge1
+            elif edge2:
+                chosen_edge = edge2
+            else:
                 continue
-            if edge1 is not None:
-                edges[i] = edge1
-            elif edge2 is not None:
-                edges[i] = edge2
+
+            new_edge = deepcopy(chosen_edge)
+            edges[edge_id] = new_edge
+            nodes_needed.update([new_edge.from_node, new_edge.to_node])
+
+        nodes = {}
+        for node_id in nodes_needed:
+            node = parent1.nodes.get(node_id) or parent2.nodes.get(node_id)
+            if node:
+                nodes[node_id] = deepcopy(node)
+            else:
+                raise ValueError(f"Node {node_id} not found in parents.")
+
         return cls(nodes, edges)
 
     def mutate(self) -> 'Genome':
         from .superparams import add_edge_rate, add_node_rate, change_weight_rate, disable_weight_rate
-        new_genome = Genome(self.nodes.copy(), self.edges.copy())
+        new_genome = Genome(deepcopy(self.nodes), deepcopy(self.edges))
+
         if random.random() < add_edge_rate:
             new_genome._add_edge()
         if random.random() < add_node_rate:
@@ -158,31 +220,38 @@ class Genome:
         cnt = 0
         while cnt < 30:
             cnt += 1
-            from_node = random.choice(list(self.nodes.keys()))
-            to_node = random.choice(list(self.nodes.keys()))
-            if from_node == to_node:
-                continue
+            from_node, to_node = random.choices(list(self.nodes.keys()), k=2)
+
+            # make sure the edge is feed forward
             if self.depth_map[from_node] >= self.depth_map[to_node]:
-                # make sure the edge is feed forward
                 continue
+            # make sure the edge doesn't exist
             if any(edge.from_node == from_node and edge.to_node == to_node for edge in self.edges.values()):
                 continue
+
+            print(f'{from_node} -> {to_node}')
+
             new_edge = Gene(from_node, to_node, random.random())
             self.edges[new_edge.id] = new_edge
             break
+
         self.calculate_node_topology()
 
     def _add_node(self):
         edge = random.choice(list(self.edges.values()))
         from_node = edge.from_node
         to_node = edge.to_node
-        new_node = Node(len(self.nodes))
+        new_node = Node()
+
+        new_edge_1 = Gene(from_node, new_node.node_id, random.random())
+        new_edge_2 = Gene(new_node.node_id, to_node, random.random())
+
         self.nodes[new_node.node_id] = new_node
-        new_edge = Gene(from_node, new_node.node_id, random.random())
-        self.edges[new_edge.id] = new_edge
-        new_edge = Gene(new_node.node_id, to_node, random.random())
-        self.edges[new_edge.id] = new_edge
+        self.edges[new_edge_1.id] = new_edge_1
+        self.edges[new_edge_2.id] = new_edge_2
+
         self.edges[edge.id].weight = 0 # disable the old edge
+
         self.calculate_node_topology()
 
     def _change_weight(self):
@@ -209,6 +278,10 @@ class Genome:
         with open(file, "rb") as f:
             res = pickle.load(f)
         return res
+
+
+
+
 
 
 
