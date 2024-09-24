@@ -1,12 +1,12 @@
 import math
 
+from slime_volleyball.core import constants
+from slime_volleyball.core import utils
 from slime_volleyball.core.objects import (
     RelativeState,
     half_circle,
     circle,
 )
-from slime_volleyball.core import constants
-from slime_volleyball.core import utils
 
 
 class Agent:

@@ -1,16 +1,14 @@
 import os
 import random
 
+from fitness import get_score
 from neat.activation import sigmoid
 from neat.gene import Gene
+from neat.genome import Genome
 from neat.node import Node
 from neat.population import Population
-from neat.genome import Genome
 from neat.recorder import Recorder, delete_all_files_in_folder
-from neat.species import Species
 from neat.superparams import disable_weight_rate, checkpoint_path
-from fitness import get_score
-
 
 input_node_num = 12
 output_node_num = 3

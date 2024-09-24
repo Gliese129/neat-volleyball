@@ -1,12 +1,11 @@
+import pickle
 import random
 from copy import deepcopy
 
 import jax.numpy as jnp
-import pydot
 
 from .gene import Gene
 from .node import Node
-import pickle
 
 
 class Genome:
@@ -25,6 +24,8 @@ class Genome:
     def cell_num(self): return len(self.nodes)
     @property
     def edge_num(self): return len(self.edges)
+    @property
+    def genome_id(self): return f'{self.generation}_{self.idx}'
 
 
     def __init__(self, nodes: list[Node] | dict[int, Node], edges: list[Gene] | dict[int, Gene], generation: int = None, idx: int = None):

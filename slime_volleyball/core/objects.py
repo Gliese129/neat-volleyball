@@ -3,8 +3,8 @@ import math
 import cv2
 import numpy as np
 
-from slime_volleyball.core import constants
 from slime_volleyball import rendering
+from slime_volleyball.core import constants
 from slime_volleyball.core import utils
 
 

@@ -1,4 +1,3 @@
-import jax
 import jax.numpy as jnp
 
 def sigmoid(x: jnp.ndarray) -> jnp.ndarray:

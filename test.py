@@ -1,12 +1,10 @@
 import numpy as np
 
 from neat.activation import softmax
+from neat.genome import Genome
+from neat.superparams import action_threshold
 from slime_volleyball.core import constants
 from slime_volleyball.slimevolley_env import SlimeVolleyEnv
-from slime_volleyball.baseline_policy import BaselinePolicy
-from neat.genome import Genome
-import jax.numpy as jnp
-from neat.superparams import action_threshold
 
 best_model = './output/best.pickle'
 

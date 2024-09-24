@@ -1,3 +1,4 @@
+import multiprocessing as mp
 import os
 import pickle
 import random
@@ -7,7 +8,6 @@ from typing import Optional
 from neat.genome import Genome
 from neat.recorder import Recorder
 from neat.species import Species
-import multiprocessing as mp
 from neat.superparams import checkpoint_path, checkpoint_rate
 
 

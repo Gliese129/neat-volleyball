@@ -1,12 +1,11 @@
+import random
 from typing import Tuple
 
-from neat.genome import Genome
-import random
-from slime_volleyball.slimevolley_env import SlimeVolleyEnv
-from slime_volleyball.baseline_policy import BaselinePolicy
 from neat.activation import softmax
+from neat.genome import Genome
 from neat.superparams import action_threshold
-
+from slime_volleyball.baseline_policy import BaselinePolicy
+from slime_volleyball.slimevolley_env import SlimeVolleyEnv
 
 max_step = 200
 

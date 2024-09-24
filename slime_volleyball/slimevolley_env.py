@@ -14,16 +14,16 @@ No dependencies apart from Numpy and Gym
 
 import typing
 
+import cv2  # installed with gym anyways
 import gymnasium as gym
+import numpy as np
 from gymnasium import spaces
 from gymnasium.envs.registration import register
-import numpy as np
-import cv2  # installed with gym anyways
 
-from slime_volleyball.core import constants
-from slime_volleyball.core import game
 from slime_volleyball import rendering
 from slime_volleyball.baseline_policy import BaselinePolicy
+from slime_volleyball.core import constants
+from slime_volleyball.core import game
 from slime_volleyball.core import utils
 
 np.set_printoptions(threshold=20, precision=3, suppress=True, linewidth=200)

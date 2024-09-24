@@ -1,6 +1,6 @@
 from typing import Optional
 
-from neat.genome import Genome
+from .genome import Genome
 from .superparams import distance_threshold, species_best_size
 
 
