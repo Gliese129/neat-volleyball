@@ -9,6 +9,15 @@ from slime_volleyball.slimevolley_env import SlimeVolleyEnv
 
 max_step = 200
 
+
+def process_action(action_predict):
+    action = [0 for _ in range(action_predict.shape[0])]
+    for i in range(action_predict.shape[0]):
+        if action_predict[i] > action_threshold:
+            action[i] = 1
+    return action
+
+
 def get_score(left: Genome, right: Genome = None) -> Tuple[float, float]:
     """
     Get the score of the left and right genomes
@@ -41,20 +50,12 @@ def get_score(left: Genome, right: Genome = None) -> Tuple[float, float]:
 
         # softmax
         left_action_predict = softmax(left_action_predict)
-        left_action = [0 for _ in range(left_action_predict.shape[0])]
-        for i in range(left_action_predict.shape[0]):
-            if left_action[i] > action_threshold:
-                left_action[i] = 1
-
-        if use_baseline:
-            right_action = right_action_predict
-        else:
+        right_action = right_action_predict
+        if not use_baseline:
             right_action_predict = softmax(right_action_predict)
-            right_action = [0 for _ in range(right_action_predict.shape[0])]
-            for i in range(right_action_predict.shape[0]):
-                if right_action[i] > action_threshold:
-                    right_action[i] = 1
+            right_action = process_action(right_action_predict)
 
+        left_action = process_action(left_action_predict)
 
         actions = {"agent_left": left_action, "agent_right": right_action}
         obs, reward, terminateds, truncateds, _ = env.step(actions)
@@ -62,7 +63,9 @@ def get_score(left: Genome, right: Genome = None) -> Tuple[float, float]:
         left_reward += reward["agent_left"]
         right_reward += reward["agent_right"]
         steps += 1
+
     env.close()
+
     # return the score of the right agent
     if swap_left:
         return right_reward, left_reward

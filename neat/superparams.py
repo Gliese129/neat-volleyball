@@ -1,4 +1,4 @@
-from .activation import relu
+from .activation import relu, sigmoid
 
 # distance
 distance_threshold = 3.0
@@ -12,10 +12,10 @@ crossover_rate = 0.7
 add_edge_rate = 0.2
 add_node_rate = 0.1
 change_weight_rate = 0.8
-disable_weight_rate = 0.05
+disable_weight_rate = 0.1
 
 # activation
-activation_functions = relu
+activation_functions = sigmoid
 
 # population
 population_size = 100
