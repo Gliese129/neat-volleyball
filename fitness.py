@@ -17,9 +17,14 @@ def get_score(left: Genome, right: Genome = None) -> Tuple[float, float]:
     :return:
     """
 
+    swap_left = random.random() > 0.5
     use_baseline = right is None
     if right is None:
         right = BaselinePolicy()  # defaults to use RNN Baseline for player
+
+    # swap the left and right if swipe_left is True
+    if swap_left:
+        left, right = right, left
 
     env = SlimeVolleyEnv({"survival_reward": True, "human_actions": False})
 
@@ -59,4 +64,6 @@ def get_score(left: Genome, right: Genome = None) -> Tuple[float, float]:
         steps += 1
     env.close()
     # return the score of the right agent
+    if swap_left:
+        return right_reward, left_reward
     return left_reward, right_reward

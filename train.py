@@ -42,14 +42,14 @@ def fittest_func(this: Genome, all_genomes: list[Genome], this_specie: list[Geno
     tot_score = 0
     # all
     env_score = 0
-    others = random.choices(all_genomes, k = random_pick_size)
+    others = random.sample(all_genomes, k = random_pick_size)
     for rival in others:
         left_score, _ = get_score(this, rival)
         env_score += left_score
     env_score /= len(others)
     # only same specie
     specie_score = 0
-    others = random.choices(this_specie, k = min(random_pick_size, len(this_specie)))
+    others = random.sample(this_specie, k = min(random_pick_size, len(this_specie)))
     for rival in others:
         left_score, _ = get_score(this, rival)
         specie_score += left_score
