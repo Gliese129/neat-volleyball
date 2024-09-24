@@ -49,13 +49,15 @@ def get_score(left: Genome, right: Genome = None) -> Tuple[float, float]:
         right_action_predict = right.predict(obs_right['obs'])
 
         # softmax
-        left_action_predict = softmax(left_action_predict)
         right_action = right_action_predict
-        if not use_baseline:
+        if type(right_action_predict) is not list:
             right_action_predict = softmax(right_action_predict)
             right_action = process_action(right_action_predict)
 
-        left_action = process_action(left_action_predict)
+        left_action = left_action_predict
+        if type(left_action_predict) is not list:
+            left_action_predict = softmax(left_action_predict)
+            left_action = process_action(left_action_predict)
 
         actions = {"agent_left": left_action, "agent_right": right_action}
         obs, reward, terminateds, truncateds, _ = env.step(actions)
