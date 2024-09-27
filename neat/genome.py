@@ -1,3 +1,4 @@
+import json
 import pickle
 import random
 from copy import deepcopy
@@ -19,6 +20,7 @@ class Genome:
     input_nodes: list[Node]
     generation: int
     idx: int
+    activation_name: str
 
     @property
     def cell_num(self): return len(self.nodes)
@@ -28,7 +30,7 @@ class Genome:
     def genome_id(self): return f'{self.generation}_{self.idx}'
 
 
-    def __init__(self, nodes: list[Node] | dict[int, Node], edges: list[Gene] | dict[int, Gene], generation: int = None, idx: int = None):
+    def __init__(self, nodes: list[Node] | dict[int, Node], edges: list[Gene] | dict[int, Gene], generation: int = None, idx: int = None, activation_name: str = None):
         if isinstance(nodes, list):
             nodes = {node.node_id: node for node in nodes}
         if isinstance(edges, list):
@@ -39,6 +41,7 @@ class Genome:
         self.calculate_node_topology()
         self.generation = generation
         self.idx = idx
+        self.activation_name = activation_name
 
     def calculate_node_topology(self):
         """
@@ -196,12 +199,12 @@ class Genome:
         nodes = {}
         for node_id in nodes_needed:
             node = parent1.nodes.get(node_id) or parent2.nodes.get(node_id)
-            if node:
+            if node:         
                 nodes[node_id] = deepcopy(node)
             else:
                 raise ValueError(f"Node {node_id} not found in parents.")
 
-        return cls(nodes, edges)
+        return cls(nodes, edges, activation_name=parent1.activation_name)
 
     def mutate(self) -> 'Genome':
         from .superparams import add_edge_rate, add_node_rate, change_weight_rate, disable_weight_rate
@@ -242,7 +245,7 @@ class Genome:
         edge = random.choice(list(self.edges.values()))
         from_node = edge.from_node
         to_node = edge.to_node
-        new_node = Node()
+        new_node = Node(activation_name=self.activation_name)
 
         new_edge_1 = Gene(from_node, new_node.node_id, random.random())
         new_edge_2 = Gene(new_node.node_id, to_node, random.random())
@@ -270,15 +273,47 @@ class Genome:
     def __sub__(self, other):
         return self.distance(other)
 
+    def to_dict(self) -> dict:
+        """
+        Convert the Genome object to a dictionary that can be serialized to JSON.
+        """
+        return {
+            "nodes": {node_id: node.to_dict() for node_id, node in self.nodes.items()},
+            "edges": {edge_id: edge.to_dict() for edge_id, edge in self.edges.items()},
+            "generation": self.generation,
+            "idx": self.idx,
+            "input_nodes": [node.node_id for node in self.input_nodes],
+            "output_nodes": [node.node_id for node in self.output_nodes]
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'Genome':
+        """
+        Create a Genome object from a dictionary.
+        """
+        nodes = {node_id: Node.from_dict(node_data) for node_id, node_data in data["nodes"].items()}
+        edges = {edge_id: Gene.from_dict(edge_data) for edge_id, edge_data in data["edges"].items()}
+
+        genome = cls(nodes, edges, generation=data["generation"], idx=data["idx"])
+        genome.input_nodes = [nodes[node_id] for node_id in data["input_nodes"]]
+        genome.output_nodes = [nodes[node_id] for node_id in data["output_nodes"]]
+        return genome
+
     def save(self, file: str):
-        with open(file, "wb") as f:
-            pickle.dump(self, f)
+        """
+        Save the Genome object to a JSON file.
+        """
+        with open(file, "w") as f:
+            json.dump(self.to_dict(), f, indent=4)
 
     @staticmethod
     def load(file: str) -> 'Genome':
-        with open(file, "rb") as f:
-            res = pickle.load(f)
-        return res
+        """
+        Load a Genome object from a JSON file.
+        """
+        with open(file, "r") as f:
+            data = json.load(f)
+        return Genome.from_dict(data)
 
 
 

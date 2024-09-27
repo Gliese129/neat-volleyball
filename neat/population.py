@@ -84,7 +84,7 @@ class Population:
             best.idx = len(new_organisms)
             new_organisms.append(best)
             # crossover
-            for _ in range(species_best_size):
+            for _ in range(species_best_size * 2):
                 choice_weights = [genome.adjusted_fitness for genome in specie.genomes]
                 sum_ = sum(choice_weights)
                 choice_weights = [w / sum_ for w in choice_weights]
@@ -112,11 +112,10 @@ class Population:
         self.species = []
         self.organisms = self.organisms[:self.max_size]
 
-        self.add_checkpoint()
+        if self.steps % checkpoint_rate == 0:
+            self.add_checkpoint()
 
     def add_checkpoint(self):
-        if self.steps % checkpoint_rate:
-            return
         file = os.path.join(checkpoint_path, f'checkpoint_{self.steps}.pickle')
         with open(file, 'wb') as f:
             pickle.dump(self, f)

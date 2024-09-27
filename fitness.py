@@ -7,7 +7,6 @@ from neat.superparams import action_threshold
 from slime_volleyball.baseline_policy import BaselinePolicy
 from slime_volleyball.slimevolley_env import SlimeVolleyEnv
 
-max_step = 200
 
 
 def process_action(action_predict):
@@ -18,11 +17,12 @@ def process_action(action_predict):
     return action
 
 
-def get_score(left: Genome, right: Genome = None) -> Tuple[float, float]:
+def get_score(left: Genome, right: Genome = None, max_step = 200) -> Tuple[float, float]:
     """
     Get the score of the left and right genomes
     :param left:
     :param right:
+    :param max_step:
     :return:
     """
 

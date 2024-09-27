@@ -23,7 +23,9 @@ species_best_size = 20
 
 # play
 action_threshold = 0.6
+game_step_growth_rate = 1.1
+base_game_step = 150
 
 # others
 checkpoint_path = './checkpoint'
-checkpoint_rate = 5
+checkpoint_rate = 1

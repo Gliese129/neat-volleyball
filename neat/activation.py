@@ -1,5 +1,7 @@
 import jax.numpy as jnp
 
+
+
 def sigmoid(x: jnp.ndarray) -> jnp.ndarray:
     return 0.5 * (jnp.tanh(x / 2.) + 1)
 
@@ -15,3 +17,12 @@ def softmax(x: jnp.ndarray) -> jnp.ndarray:
 
 def none_(x: jnp.ndarray) -> jnp.ndarray:
     return x
+
+
+activation_function_dict = {
+    'sigmoid': sigmoid,
+    'tanh': tanh,
+    'relu': relu,
+    'softmax': softmax,
+    'none': none_
+}
