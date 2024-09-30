@@ -1,7 +1,5 @@
-from .activation import relu, sigmoid
-
 # distance
-distance_threshold = 3.0
+distance_threshold = 2.0
 c1 = 1.0
 c2 = 1.0
 c3 = 0.4
@@ -14,12 +12,10 @@ add_node_rate = 0.1
 change_weight_rate = 0.8
 disable_weight_rate = 0.1
 
-# activation
-activation_functions = sigmoid
-
 # population
 population_size = 100
-species_best_size = 20
+specie_best_size = 50
+extinct_rate = 0.4
 
 # play
 action_threshold = 0.6

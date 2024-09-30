@@ -1,14 +1,14 @@
 import os
 import random
 
-from fitness import get_score
-from neat.activation import sigmoid
+from score import get_score
+from neat.activation import sigmoid, ActivationFunction
 from neat.gene import Gene
 from neat.genome import Genome
 from neat.node import Node
 from neat.population import Population
 from neat.recorder import Recorder, delete_all_files_in_folder
-from neat.superparams import disable_weight_rate, checkpoint_path, population_size, game_step_growth_rate, base_game_step
+from neat.superparams import disable_weight_rate, checkpoint_path, game_step_growth_rate, base_game_step
 
 input_node_num = 12
 output_node_num = 3
@@ -21,10 +21,9 @@ log_path = './log'
 
 
 def gen_init_genomes():
-    input_nodes = [Node() for _ in range(input_node_num)]
+    input_nodes = [Node(activation=ActivationFunction.NONE) for _ in range(input_node_num)]
     output_nodes = [Node() for _ in range(output_node_num)]
     init_nodes = input_nodes + output_nodes
-    init_nodes[-1].activation = sigmoid
     init_genomes = []
     for _ in range(init_population_size):
         edges = []
@@ -62,26 +61,34 @@ def fittest_func(this: Genome, all_genomes: list[Genome], this_specie: list[Geno
     return env_score + specie_score + base_score
 
 
-if resume:
-    population = Population.load_checkpoint(resume)
-else:
-    population = Population(gen_init_genomes(), 100, fittest_func)
+population: Population = None
+recorder: Recorder = None
+def init():
+    global population, recorder
+    if resume:
+        population = Population.load_checkpoint(resume, fittness_func=fittest_func)
+    else:
+        population = Population(gen_init_genomes(), 100, fittness_func=fittest_func)
 
-recorder = Recorder(log_path)
+    recorder = Recorder(log_path)
 
 # remove all files
 
 if __name__ == '__main__':
+    init()
     if os.path.exists(log_path):
         delete_all_files_in_folder(log_path)
     if not os.path.exists(log_path):
         os.makedirs(log_path)
     if not os.path.exists(checkpoint_path):
         os.makedirs(checkpoint_path)
+
     print('Start training')
     for i in range(steps):
         recorder.new_step(i)
         population.step(recorder=recorder)
         print(f'step {i + 1}, best fitness: {population.best.fitness} size: {len(population.organisms)}')
-        print(population.best)
-    population.best.save('./output/best.pickle')
+        if i % 5 == 0:
+            population.add_checkpoint()
+    population.close()
+    population.best.save('./output/best.json')

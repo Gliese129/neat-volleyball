@@ -1,6 +1,9 @@
+from typing import List, Tuple
+
 from .global_state import InnovationNumber
-from .activation import activation_function_dict
-nodes = []
+from .activation import ActivationFunction
+
+import jax.numpy as jnp
 
 class Node:
     """
@@ -8,24 +11,32 @@ class Node:
     """
 
     node_id: int
-    activation: any
-    activation_name: str
+    activation: ActivationFunction
 
     x: float
+    from_nodes: List[Tuple['Node', float]] # (from_node, weight)
 
-    def __init__(self, node_id: int = None, activation_name: str = None):
-
+    def __init__(self, node_id: int = None, activation: ActivationFunction = None, randomize: bool = True):
         if node_id is None:
             node_id = InnovationNumber.new_node_innovation_number()
-        if activation_name is None:
-            activation_name = 'none'
+        if activation is None:
+            if randomize:
+                activation = ActivationFunction.random()
+            else:
+                activation = ActivationFunction.NONE
 
-        self.activation_name = activation_name
         self.node_id = node_id
-        self.activation = activation_function_dict[activation_name]
+        self.activation = activation
 
     def __str__(self):
         return f'Node {self.node_id}'
+
+    def forward(self) -> jnp.array:
+        if self.x is not None:
+            return self.x
+        x = jnp.array([from_node.forward() * weight for from_node, weight in self.from_nodes])
+        self.x = self.activation(x.sum()).tolist()
+        return self.x
 
     def to_dict(self) -> dict:
         """
@@ -33,7 +44,7 @@ class Node:
         """
         return {
             "node_id": self.node_id,
-            "activation": self.activation_name
+            "activation": self.activation.value
         }
 
     @classmethod
@@ -43,6 +54,7 @@ class Node:
         :param data: The dictionary containing node data.
         :return: Node object
         """
-        node_id = data["node_id"]
-        activation_name = data["activation"]
-        return cls(node_id=node_id, activation_name=activation_name)
+        node_id = int(data["node_id"])
+        activation = data["activation"]
+        activation = ActivationFunction.from_str(activation)
+        return cls(node_id=node_id, activation=activation)

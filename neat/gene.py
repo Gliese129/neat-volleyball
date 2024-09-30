@@ -37,6 +37,6 @@ class Gene:
         Create a Gene object from a dictionary.
         """
         # Assuming the ID is provided in the dictionary, which is generated during the gene's creation.
-        gene = cls(data["from_node"], data["to_node"], data["weight"])
-        gene.id = data["id"]
+        gene = cls(int(data["from_node"]), int(data["to_node"]), float(data["weight"]))
+        gene.id = int(data["id"])
         return gene

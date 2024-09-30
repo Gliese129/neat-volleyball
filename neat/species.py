@@ -1,17 +1,18 @@
-from typing import Optional
+import math
+from typing import Optional, List
 
 from .genome import Genome
-from .superparams import distance_threshold, species_best_size
+from .superparams import distance_threshold, specie_best_size
 
 
 class Species:
-    genomes: list[Genome]
+    organisms: List[Genome]
     representative: Genome
     best: Optional[Genome]
 
     def __init__(self, representative: Genome):
         self.representative = representative
-        self.genomes = []
+        self.organisms = []
         self.best = None
 
     def distance(self, genome: Genome) -> float:
@@ -21,8 +22,13 @@ class Species:
         return self.distance(genome) < distance_threshold
 
     def set_adjusted_fitness(self):
-        n = 1 if len(self.genomes) < species_best_size else len(self.genomes)
-        for genome in self.genomes:
+        if len(self.organisms) <= specie_best_size:
+            n = 1
+        else:
+            # When size exceeds specie_best_size, n grows exponentially
+            excess = len(self.organisms) - specie_best_size
+            n = math.exp(excess ** 0.01)
+        for genome in self.organisms:
             genome.adjusted_fitness = genome.fitness / n
             if self.best is None or genome.fitness > self.best.fitness:
                 self.best = genome

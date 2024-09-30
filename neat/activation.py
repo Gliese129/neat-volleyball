@@ -1,5 +1,7 @@
-import jax.numpy as jnp
+import enum
+import random
 
+import jax.numpy as jnp
 
 
 def sigmoid(x: jnp.ndarray) -> jnp.ndarray:
@@ -15,14 +17,31 @@ def softmax(x: jnp.ndarray) -> jnp.ndarray:
     e_x =  jnp.exp(x)
     return e_x / e_x.sum()
 
-def none_(x: jnp.ndarray) -> jnp.ndarray:
-    return x
-
-
-activation_function_dict = {
+activation_dict = {
+    'none': lambda x: x,
     'sigmoid': sigmoid,
     'tanh': tanh,
     'relu': relu,
-    'softmax': softmax,
-    'none': none_
+    'softmax': softmax
 }
+
+class ActivationFunction(enum.Enum):
+    NONE = 'none'
+    SIGMOID = 'sigmoid'
+    TANH = 'tanh'
+    RELU = 'relu'
+
+    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+        func = activation_dict[self.value]
+        return func(x)
+
+    @classmethod
+    def random(cls):
+        items = [item for item in cls if item != cls.NONE]
+        item = random.choice(items)
+        return item
+
+    @classmethod
+    def from_str(cls, name: str):
+        return cls._value2member_map_[name]
+
