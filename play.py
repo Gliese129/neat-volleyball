@@ -6,7 +6,7 @@ from neat.superparams import action_threshold
 from slime_volleyball.core import constants
 from slime_volleyball.slimevolley_env import SlimeVolleyEnv
 
-best_model = './output/best.pickle'
+best_model = './output/best_2.json'
 
 if __name__ == "__main__":
     """

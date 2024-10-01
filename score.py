@@ -41,6 +41,10 @@ def get_score(left: Genome, right: Genome = None, max_step = 200) -> Tuple[float
     steps = 0
     left_reward, right_reward = 0, 0
 
+    left_consistent_action_bonus, right_consistent_action_bonus = 0, 0
+    left_movement_bonus, right_movement_bonus = 0, 0
+    last_left_action, last_right_action = None, None
+
     terminateds = truncateds = {"__all__": False}
     while steps <= max_step and not terminateds["__all__"] and not truncateds["__all__"]:
         obs_right, obs_left = obs["agent_right"], obs["agent_left"]
@@ -59,14 +63,33 @@ def get_score(left: Genome, right: Genome = None, max_step = 200) -> Tuple[float
             left_action_predict = softmax(left_action_predict)
             left_action = process_action(left_action_predict)
 
+
         actions = {"agent_left": left_action, "agent_right": right_action}
         obs, reward, terminateds, truncateds, _ = env.step(actions)
+
+        # Bonus for consistent actions (e.g., not standing still or jumping repeatedly)
+        if left_action != last_left_action:
+            left_consistent_action_bonus += 0.1  # Encourage varied actions
+        last_left_action = left_action
+
+        if right_action != last_right_action:
+            right_consistent_action_bonus += 0.1
+        last_right_action = right_action
+
+        # Bonus for movement (AI should not stay still too long)
+        if sum(left_action) > 0:  # AI is moving or jumping
+            left_movement_bonus += 0.05  # Reward movement
+        if sum(right_action) > 0:
+            right_movement_bonus += 0.05
 
         left_reward += reward["agent_left"]
         right_reward += reward["agent_right"]
         steps += 1
 
     env.close()
+
+    left_reward += left_consistent_action_bonus + left_movement_bonus
+    right_reward += right_consistent_action_bonus + right_movement_bonus
 
     # return the score of the right agent
     if swap_left:
