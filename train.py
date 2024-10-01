@@ -13,8 +13,8 @@ from neat.superparams import disable_weight_rate, checkpoint_path, game_step_gro
 input_node_num = 12
 output_node_num = 3
 init_population_size = 80
-steps = 50
-random_pick_size = 5
+steps = 80
+random_pick_size = 3
 resume = 0
 log_path = './log'
 
@@ -30,10 +30,12 @@ def gen_init_genomes():
         for input_node in input_nodes:
             for output_node in output_nodes:
                 weight = random.random()
-                if random.random() < disable_weight_rate:
+                if random.random() < 0.5:
                     weight = 0
                 edges.append(Gene(input_node.node_id, output_node.node_id, weight))
-        init_genomes.append(Genome(init_nodes, edges))
+        organism = Genome(init_nodes, edges)
+        init_genomes.append(organism)
+        organism.genome_id_ = (0, len(init_genomes))
     return init_genomes
 
 
@@ -68,7 +70,7 @@ def init():
     if resume:
         population = Population.load_checkpoint(resume, fittness_func=fittest_func)
     else:
-        population = Population(gen_init_genomes(), 100, fittness_func=fittest_func)
+        population = Population(gen_init_genomes(), 150, fittness_func=fittest_func)
 
     recorder = Recorder(log_path)
 
@@ -85,10 +87,12 @@ if __name__ == '__main__':
 
     print('Start training')
     for i in range(steps):
-        recorder.new_step(i)
+        recorder.new_step(i + 1)
         population.step(recorder=recorder)
         print(f'step {i + 1}, best fitness: {population.best.fitness} size: {len(population.organisms)}')
         if i % 5 == 0:
             population.add_checkpoint()
+        population.best.save(f'./output/best_{i + 1}.json')
+
     population.close()
     population.best.save('./output/best.json')

@@ -27,7 +27,6 @@ def get_score(left: Genome, right: Genome = None, max_step = 200) -> Tuple[float
     """
 
     swap_left = random.random() > 0.5
-    use_baseline = right is None
     if right is None:
         right = BaselinePolicy()  # defaults to use RNN Baseline for player
 
@@ -42,6 +41,9 @@ def get_score(left: Genome, right: Genome = None, max_step = 200) -> Tuple[float
     left_reward, right_reward = 0, 0
 
     terminateds = truncateds = {"__all__": False}
+
+    left_action_all_zero, right_action_all_zero = True, True
+
     while steps <= max_step and not terminateds["__all__"] and not truncateds["__all__"]:
         obs_right, obs_left = obs["agent_right"], obs["agent_left"]
 
@@ -59,6 +61,11 @@ def get_score(left: Genome, right: Genome = None, max_step = 200) -> Tuple[float
             left_action_predict = softmax(left_action_predict)
             left_action = process_action(left_action_predict)
 
+        if any(left_action):
+            left_action_all_zero = False
+        if any(right_action):
+            right_action_all_zero = False
+
         actions = {"agent_left": left_action, "agent_right": right_action}
         obs, reward, terminateds, truncateds, _ = env.step(actions)
 
@@ -67,6 +74,12 @@ def get_score(left: Genome, right: Genome = None, max_step = 200) -> Tuple[float
         steps += 1
 
     env.close()
+
+    # punishment
+    if left_action_all_zero:
+        left_reward = -0.5
+    if right_action_all_zero:
+        right_reward = -0.5
 
     # return the score of the right agent
     if swap_left:

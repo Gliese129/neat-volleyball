@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import List, Dict, Tuple
 
 import jax.numpy as jnp
+from scipy.special.cython_special import inv_boxcox1p
 
 from .gene import Gene
 from .node import Node
@@ -24,7 +25,7 @@ class Genome:
 
     @property
     def genome_id(self):
-        return f'{self.genome_id_[0]}_{self.genome_id_[1]}'
+        return f'{self.genome_id_[0] + 1}_{self.genome_id_[1]}'
 
 
     def __init__(self, nodes: List[Node] | Dict[int, Node], edges: List[Gene] | Dict[int, Gene],
@@ -129,22 +130,29 @@ class Genome:
         disjoint = 0
         excess = 0
         weight_diff = 0
-        max_edge_id = max(self.edges.keys() | another.edges.keys())
-        for i in range(max_edge_id):
-            edge1 = self.edges.get(i)
-            edge2 = another.edges.get(i)
+        self_edges = {edge.id: edge for edge in self.edges.values() if edge.weight > 0}
+        another_edges = {edge.id: edge for edge in another.edges.values() if edge.weight > 0}
+        edge_ids = set(self_edges.keys()).union(another_edges.keys())
+        for i in edge_ids:
+            edge1 = self_edges.get(i)
+            edge2 = another_edges.get(i)
+
+            edge1 = edge1 if edge1 and edge1.weight > 0 else None
+            edge2 = edge2 if edge2 and edge2.weight > 0 else None
+
             if edge1 is None and edge2 is None:
                 continue
             if edge1 is None or edge2 is None:
-                if i <= min(max(self.edges.keys()), max(another.edges.keys())):
+                if i <= min(max(self_edges.keys()), max(another_edges.keys())):
                     disjoint += 1
                 else:
                     excess += 1
                 continue
             weight_diff += abs(edge1.weight - edge2.weight)
-        disjoint /= max(1, len(self.edges) + len(another.edges))
-        excess /= max(1, len(self.edges) + len(another.edges))
-        weight_diff /= max(1, len(self.edges) + len(another.edges))
+        N = max(len(self_edges), len(another_edges))
+        disjoint /= N
+        excess /= N
+        weight_diff /= N
         return c1 * disjoint + c2 * excess + c3 * weight_diff
 
     @classmethod
@@ -191,19 +199,24 @@ class Genome:
 
         return cls(nodes, edges)
 
-    def mutate(self) -> 'Genome':
+    def mutate(self) -> Tuple['Genome', List[str]]:
         from .superparams import add_edge_rate, add_node_rate, change_weight_rate, disable_weight_rate
         new_genome = Genome(deepcopy(self.nodes), deepcopy(self.edges))
+        innovations = []
 
         if random.random() < add_edge_rate:
             new_genome._add_edge()
+            innovations.append('add edge')
         if random.random() < add_node_rate:
             new_genome._add_node()
+            innovations.append('add node')
         if random.random() < change_weight_rate:
             new_genome._change_weight()
+            innovations.append('change weight')
         if random.random() < disable_weight_rate:
             new_genome._disable_weight()
-        return new_genome
+            innovations.append('disable weight')
+        return new_genome, innovations
 
     def _add_edge(self):
         cnt = 0

@@ -1,0 +1,8 @@
+gymnasium==0.29.1
+jax==0.4.33
+numpy==2.1.1
+opencv_python==4.10.0.84
+pydot==3.0.1
+pyglet==2.0.17
+scipy==1.14.1
+six==1.16.0

@@ -58,7 +58,8 @@ class Population:
                 train_set.append((organism, self.organisms, specie.organisms, self.fitness_func, self.steps))
                 idx_map[organism.genome_id_] = organism
 
-        results = self.pool.map(self.compute_fitness, train_set)
+        results = self.pool.map(self.compute_fitness, train_set, chunksize=8)
+        # results = [self.compute_fitness(train) for train in train_set]
 
         for organism, fitness in results:
             idx_map[organism.genome_id_].fitness = fitness
@@ -71,7 +72,7 @@ class Population:
         self.pool.join()
 
     def step(self, recorder: Recorder):
-        from .superparams import mutation_rate, crossover_rate, extinct_rate
+        from .superparams import mutation_rate, crossover_rate, extinct_rate, min_population_size, max_population_size
         self.steps += 1
         recorder.new_step(self.steps)
         self.speciate()
@@ -81,12 +82,27 @@ class Population:
             recorder.record_specie(specie)
             specie.set_adjusted_fitness()
 
+        self.species.sort(key=lambda x: x.best.adjusted_fitness, reverse=True)
+        # eliminate the worst specie
+        if random.random() < extinct_rate and len(self.species) > 1:
+            self.species.pop(-1)
+
+        # calculation produce rate
+        population_size = len(self.organisms)
+        scale = (population_size - min_population_size) / (max_population_size - min_population_size)
+
+        if population_size <= min_population_size:
+            produce_rate = 1 + random.random() * 0.5
+        elif population_size >= max_population_size:
+            produce_rate = random.random() * 0.5
+        else:
+            produce_rate = 1 - scale * random.random()
+
+        produce_rate *= 0.5
+
         # generate the next generation
         new_organisms = []
         for specie in self.species:
-            # eliminate the worst organisms
-            if random.random() < extinct_rate:
-                specie.organisms = specie.organisms[:specie_best_size]
             # elitism
             best = deepcopy(specie.best)
             new_organisms.append(best)
@@ -94,11 +110,11 @@ class Population:
             if recorder:
                 recorder.record_innovation([specie.best], best)
             # calculate choice weight based on fitness
-            choice_weights = jnp.array([organism.adjusted_fitness for organism in specie.organisms])
-            choice_weights /= choice_weights.sum()
-            choice_weights = choice_weights.tolist()
+            choice_weights = [organism.adjusted_fitness for organism in specie.organisms]
+            total_fitness = sum(choice_weights)
+            choice_weights = [w / total_fitness for w in choice_weights]
             # crossover
-            for _ in range(int(random.random() * len(specie.organisms))):
+            for _ in range(int(population_size * produce_rate)):
                 if random.random() < crossover_rate:
                     parent1, parent2 = random.choices(specie.organisms, weights=choice_weights, k=2)
                     try:
@@ -106,25 +122,25 @@ class Population:
                         new_organisms.append(child)
                         child.genome_id_ = (self.steps, len(new_organisms))
                         if recorder:
-                            recorder.record_innovation([parent1, parent2], child)
+                            recorder.record_innovation([parent1, parent2], child, innovation_type='crossover')
                     except Exception as e:
                         print(e)
             # mutation
-            for _ in range(int(random.random() * len(specie.organisms))):
+            for _ in range(int(population_size * produce_rate)):
                 if random.random() < mutation_rate:
                     organism = random.choices(specie.organisms, weights=choice_weights, k=1)[0]
-                    new_organism = organism.mutate()
+                    new_organism, innovation_types = organism.mutate()
                     new_organisms.append(new_organism)
                     new_organism.genome_id_ = (self.steps, len(new_organisms))
                     if recorder:
-                        recorder.record_innovation([organism], new_organism)
+                        recorder.record_innovation([organism], new_organism, innovation_type='|'.join(innovation_types))
 
         # Control population size
         new_organisms = [organism for organism in new_organisms
                           if len(organism.input_nodes) == len(self.organisms[0].input_nodes)
                           and len(organism.output_nodes) == len(self.organisms[0].output_nodes)]
         if len(new_organisms) > self.max_size:
-            new_organisms = random.sample(new_organisms, self.max_size)
+            new_organisms = new_organisms[:self.max_size]
         self.organisms = new_organisms
 
     def to_dict(self) -> dict:

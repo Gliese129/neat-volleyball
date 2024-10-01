@@ -12,7 +12,7 @@ class Species:
 
     def __init__(self, representative: Genome):
         self.representative = representative
-        self.organisms = []
+        self.organisms = [representative]
         self.best = None
 
     def distance(self, genome: Genome) -> float:

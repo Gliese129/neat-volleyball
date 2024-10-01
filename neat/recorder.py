@@ -1,5 +1,6 @@
 import os
 import shutil
+from typing import Optional
 
 import pydot
 
@@ -28,7 +29,7 @@ class Recorder:
 
     def new_step(self, step: int):
         # generate img files
-        self.log_file = os.path.join(self.folder, f'recorder_{step}.md')
+        self.log_file = os.path.join(self.folder, f'recorder_{step}.log')
         self.img_folder = os.path.join(self.folder, str(step))
         self.networks = dict() # organism -> img
         self.step = step
@@ -60,25 +61,30 @@ class Recorder:
         # add log
         with open(self.log_file, 'a') as f:
             # record species
-            content = [f"   [{organism.genome_id} fittness {organism.fitness}]({self.networks[organism.genome_id]})"
-                       for organism in specie.organisms]
+            content = [f"{organism.genome_id}: fittness {organism.fitness}"for organism in specie.organisms]
             content = '\n'.join(content)
-            f.write(f'specie:\n {content}')
+            f.write(f'\nSpecie:\n{content}\n')
 
-    def record_innovation(self, parents: list[Genome], child: Genome):
+    def record_innovation(self, parents: list[Genome], child: Genome, innovation_type: str = 'innovation'):
         with open(self.log_file, 'a') as f:
             if len(parents) == 1:
                 content = parents[0].genome_id
             else:
                 content = ' X '.join([parent.genome_id for parent in parents])
-            f.write(f'innovation:\n {content} => {child.genome_id}\n')
+            f.write(f'{innovation_type}:\n {content} => {child.genome_id}\n')
 
     @staticmethod
     def network_to_img(network: Genome, file: str):
-        graph = pydot.Dot(graph_type='digraph')
+        graph = pydot.Dot(graph_type='digraph', layout='fdp', splines='true', nodesep='0.5', ranksep='0.5')
         node_map = {}
         for node in network.nodes.values():
-            graph_node = pydot.Node(node.node_id, label=node.activation.value)
+            if node in network.input_nodes:
+                rank = 'min'
+            elif node in network.output_nodes:
+                rank = 'max'
+            else:
+                rank = 'same'
+            graph_node = pydot.Node(node.node_id, label=node.activation.value, rank=rank)
             node_map[node.node_id] = graph_node
             graph.add_node(graph_node)
 
