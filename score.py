@@ -74,6 +74,9 @@ def get_score(left: GenomePolicy | Genome, right: GenomePolicy | Genome = None, 
     steps = 0
     left_reward, right_reward = 0, 0
 
+    idle_steps = 0
+    max_idle_steps = max_step // 4
+
     terminateds = truncateds = {"__all__": False}
     while steps <= max_step and not terminateds["__all__"] and not truncateds["__all__"]:
         obs_right, obs_left = obs["agent_right"], obs["agent_left"]
@@ -83,6 +86,18 @@ def get_score(left: GenomePolicy | Genome, right: GenomePolicy | Genome = None, 
 
         actions = {"agent_left": left_action, "agent_right": right_action}
         obs, reward, terminateds, truncateds, _ = env.step(actions)
+
+        # Check for idleness
+        if not any(left_action) and not any(right_action):
+            idle_steps += 1
+        else:
+            idle_steps = 0  # Reset if any action is taken
+
+        if idle_steps >= max_idle_steps:
+            # Early termination due to idleness
+            left_reward -= 0.5  # Penalize for idleness
+            right_reward -= 0.5
+            break
 
         # hit ball bonus
         if ball_is_hit(left_action, obs_left):
@@ -103,8 +118,8 @@ def get_score(left: GenomePolicy | Genome, right: GenomePolicy | Genome = None, 
 
     env.close()
 
-    if steps <= 90:
-        left_reward, right_reward = -0.1  # game will normally stop in 85 steps if both take no actions
+    if steps <= 100:
+        left_reward, right_reward = -0.1  # game will stop in 100 steps if both take no actions
 
     # return the score of the right agent
     if swap_left:
