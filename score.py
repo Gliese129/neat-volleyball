@@ -1,23 +1,49 @@
 import random
 from typing import Tuple
 
-from neat.activation import softmax
 from neat.genome import Genome
-from neat.superparams import action_threshold
+from policy import GenomePolicy
 from slime_volleyball.baseline_policy import BaselinePolicy
 from slime_volleyball.slimevolley_env import SlimeVolleyEnv
+import math
 
 
 
-def process_action(action_predict):
-    action = [0 for _ in range(action_predict.shape[0])]
-    for i in range(action_predict.shape[0]):
-        if action_predict[i] > action_threshold:
-            action[i] = 1
-    return action
+
+def ball_is_hit(agent_action, agent_obs):
+    [agent_x, agent_y, vx, vy, ball_x, ball_y, ball_vx, ball_vy, op_x, op_y, op_vx, op_vy] = agent_obs['obs']
+
+    hit_range_x = 0.1
+    hit_range_y = 0.1
+
+    # check if is in range and is taking actions
+    is_in_x_range = abs(agent_x - ball_x) < hit_range_x
+    is_in_y_range = abs(agent_y - ball_y) < hit_range_y
+
+    if is_in_x_range and is_in_y_range and any(agent_action):
+        return True
+    return False
 
 
-def get_score(left: Genome, right: Genome = None, max_step = 200) -> Tuple[float, float]:
+def calculate_distance_to_ball(agent_obs):
+    """
+    计算AI与球的距离
+    :param agent_obs: AI的观察，包括AI位置和球的位置
+    :return: AI与球之间的欧几里得距离
+    """
+    [agent_x, agent_y, vx, vy, ball_x, ball_y, ball_vx, ball_vy, op_x, op_y, op_vx, op_vy] = agent_obs['obs']
+
+    distance = ((agent_x - ball_x) ** 2 + (agent_y - ball_y) ** 2) ** 0.5
+    return distance
+
+
+def calculate_close_ball_bonus_exp(ball_distance, max_bonus=0.01, decay_rate=2.0):
+    bonus = max_bonus * math.exp(-decay_rate * ball_distance)
+    return bonus
+
+
+
+def get_score(left: GenomePolicy | Genome, right: GenomePolicy | Genome = None, max_step = 200) -> Tuple[float, float]:
     """
     Get the score of the left and right genomes
     :param left:
@@ -25,13 +51,21 @@ def get_score(left: Genome, right: Genome = None, max_step = 200) -> Tuple[float
     :param max_step:
     :return:
     """
+    # hit_bonus = 0.02
+    # distance_bonus = 0.01
 
-    swap_left = random.random() > 0.5
+    if type(left) == Genome:
+        left = GenomePolicy(left)
+    if type(right) == Genome:
+        right = GenomePolicy(right)
+
+
     if right is None:
         right = BaselinePolicy()  # defaults to use RNN Baseline for player
 
     # swap the left and right if swipe_left is True
-    if swap_left:
+    swap_left = random.random()
+    if swap_left > 0.5:
         left, right = right, left
 
     env = SlimeVolleyEnv({"survival_reward": True, "human_actions": False})
@@ -41,33 +75,27 @@ def get_score(left: Genome, right: Genome = None, max_step = 200) -> Tuple[float
     left_reward, right_reward = 0, 0
 
     terminateds = truncateds = {"__all__": False}
-
-    left_action_all_zero, right_action_all_zero = True, True
-
     while steps <= max_step and not terminateds["__all__"] and not truncateds["__all__"]:
         obs_right, obs_left = obs["agent_right"], obs["agent_left"]
 
-        left_action_predict = left.predict(obs_left['obs'])
-        right_action_predict = right.predict(obs_right['obs'])
-
-        # softmax
-        right_action = right_action_predict
-        if type(right_action_predict) is not list:
-            right_action_predict = softmax(right_action_predict)
-            right_action = process_action(right_action_predict)
-
-        left_action = left_action_predict
-        if type(left_action_predict) is not list:
-            left_action_predict = softmax(left_action_predict)
-            left_action = process_action(left_action_predict)
-
-        if any(left_action):
-            left_action_all_zero = False
-        if any(right_action):
-            right_action_all_zero = False
+        left_action = left.predict(obs_left)
+        right_action = right.predict(obs_right)
 
         actions = {"agent_left": left_action, "agent_right": right_action}
         obs, reward, terminateds, truncateds, _ = env.step(actions)
+
+        # hit ball bonus
+        if ball_is_hit(left_action, obs_left):
+            left_reward += 0.02
+        if ball_is_hit(right_action, obs_right):
+            right_action += 0.02
+
+        # distance bonus
+        left_ball_distance = calculate_distance_to_ball(obs_left)
+        left_reward += calculate_close_ball_bonus_exp(left_ball_distance, max_bonus=0.01)
+
+        right_ball_distance = calculate_distance_to_ball(obs_right)
+        right_reward += calculate_close_ball_bonus_exp(right_ball_distance, max_bonus=0.01)
 
         left_reward += reward["agent_left"]
         right_reward += reward["agent_right"]
@@ -75,11 +103,8 @@ def get_score(left: Genome, right: Genome = None, max_step = 200) -> Tuple[float
 
     env.close()
 
-    # punishment
-    if left_action_all_zero:
-        left_reward = -0.5
-    if right_action_all_zero:
-        right_reward = -0.5
+    if steps <= 90:
+        left_reward, right_reward = -0.1  # game will normally stop in 85 steps if both take no actions
 
     # return the score of the right agent
     if swap_left:

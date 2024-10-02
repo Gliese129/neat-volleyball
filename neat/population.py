@@ -58,8 +58,11 @@ class Population:
                 train_set.append((organism, self.organisms, specie.organisms, self.fitness_func, self.steps))
                 idx_map[organism.genome_id_] = organism
 
-        results = self.pool.map(self.compute_fitness, train_set, chunksize=8)
-        # results = [self.compute_fitness(train) for train in train_set]
+
+        if len(train_set) <= mp.cpu_count():
+            results = [self.compute_fitness(train) for train in train_set]
+        else:
+            results = self.pool.map(self.compute_fitness, train_set, chunksize=8)
 
         for organism, fitness in results:
             idx_map[organism.genome_id_].fitness = fitness

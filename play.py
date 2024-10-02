@@ -2,11 +2,10 @@ import numpy as np
 
 from neat.activation import softmax
 from neat.genome import Genome
-from neat.superparams import action_threshold
 from slime_volleyball.core import constants
 from slime_volleyball.slimevolley_env import SlimeVolleyEnv
 
-best_model = './output/best_4.json'
+best_model = './output/best_3.json'
 
 if __name__ == "__main__":
     """
@@ -92,7 +91,7 @@ if __name__ == "__main__":
             right_action_predict = softmax(right_action_predict)
             right_action = [0 for _ in range(right_action_predict.shape[0])]
             for i in range(right_action_predict.shape[0]):
-                if right_action_predict[i] > action_threshold:
+                if right_action_predict[i] > 0.6:
                     right_action[i] = 1
 
         if otherManualMode:
@@ -102,7 +101,7 @@ if __name__ == "__main__":
             left_action_predict = softmax(left_action_predict)
             left_action = [0 for _ in range(left_action_predict.shape[0])]
             for i in range(left_action_predict.shape[0]):
-                if left_action_predict[i] > action_threshold:
+                if left_action_predict[i] > 0.6:
                     left_action[i] = 1
             print(left_action)
 

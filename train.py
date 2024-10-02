@@ -2,19 +2,19 @@ import os
 import random
 
 from score import get_score
-from neat.activation import sigmoid, ActivationFunction
+from neat.activation import ActivationFunction
 from neat.gene import Gene
 from neat.genome import Genome
 from neat.node import Node
 from neat.population import Population
 from neat.recorder import Recorder, delete_all_files_in_folder
-from neat.superparams import disable_weight_rate, checkpoint_path, game_step_growth_rate, base_game_step
+from neat.superparams import checkpoint_path, game_step_growth_rate, base_game_step
 
 input_node_num = 12
 output_node_num = 3
-init_population_size = 80
-steps = 80
-random_pick_size = 3
+init_population_size = 100
+steps = 60
+random_pick_size = 4
 resume = 0
 log_path = './log'
 

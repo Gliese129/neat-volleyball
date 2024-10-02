@@ -77,7 +77,7 @@ class SlimeVolleyEnv(gym.Env):
 
     default_config = {
         "from_pixels": False,
-        "survival_reward": False,
+        "survival_reward": True,
         "max_steps": 3000,
         # if true, LHS actions are swapped to be intuitive for humans, otherwise directions are swapped
         "human_inputs": False,

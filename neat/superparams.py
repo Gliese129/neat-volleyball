@@ -6,20 +6,19 @@ c3 = 0.4
 
 # rate
 mutation_rate = 0.7
-crossover_rate = 0.5
-add_edge_rate = 0.3
-add_node_rate = 0.1
+crossover_rate = 0.4
+add_edge_rate = 0.2
+add_node_rate = 0.05
 change_weight_rate = 0.8
 disable_weight_rate = 0.2
 
 # population
-min_population_size = 50
-max_population_size = 150
-specie_best_size = 30
+min_population_size = 80
+max_population_size = 160
+specie_best_size = 40
 extinct_rate = 0.05
 
 # play
-action_threshold = 0.6
 game_step_growth_rate = 1.1
 base_game_step = 150
 
