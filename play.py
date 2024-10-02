@@ -2,10 +2,12 @@ import numpy as np
 
 from neat.activation import softmax
 from neat.genome import Genome
+from policy import GenomePolicy
 from slime_volleyball.core import constants
 from slime_volleyball.slimevolley_env import SlimeVolleyEnv
 
-best_model = './output/best_3.json'
+play_step = input('model step:')
+best_model = f'./output/best_{play_step}.json'
 
 if __name__ == "__main__":
     """
@@ -67,7 +69,8 @@ if __name__ == "__main__":
         if k == key.W:
             otherManualAction[2] = 0
 
-    policy = Genome.load(best_model) # defaults to use RNN Baseline for player
+    network = Genome.load(best_model)
+    policy = GenomePolicy(network)
 
     env = SlimeVolleyEnv({"survival_reward": True, "human_actions": False})
 
@@ -82,28 +85,17 @@ if __name__ == "__main__":
 
     terminateds = truncateds = {"__all__": False}
     while not terminateds["__all__"] and not truncateds["__all__"]:
-        obs_right, obs_left = obs["agent_right"]['obs'], obs["agent_left"]['obs']
+        obs_right, obs_left = obs["agent_right"], obs["agent_left"]
 
         if manualMode:  # override with keyboard
             right_action = manualAction
         else:
-            right_action_predict = policy.predict(obs_right)
-            right_action_predict = softmax(right_action_predict)
-            right_action = [0 for _ in range(right_action_predict.shape[0])]
-            for i in range(right_action_predict.shape[0]):
-                if right_action_predict[i] > 0.6:
-                    right_action[i] = 1
+            right_action = policy.predict(obs_right)
 
         if otherManualMode:
             left_action = otherManualAction
         else:
-            left_action_predict = policy.predict(obs_left)
-            left_action_predict = softmax(left_action_predict)
-            left_action = [0 for _ in range(left_action_predict.shape[0])]
-            for i in range(left_action_predict.shape[0]):
-                if left_action_predict[i] > 0.6:
-                    left_action[i] = 1
-            print(left_action)
+            left_action = policy.predict(obs_left)
 
 
         actions = {"agent_left": left_action, "agent_right": right_action}
