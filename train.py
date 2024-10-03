@@ -79,7 +79,7 @@ if __name__ == '__main__':
     input('press enter to start')
 
     init()
-    if os.path.exists(log_path):
+    if os.path.exists(log_path) and not resume:
         delete_all_files_in_folder(log_path)
     if not os.path.exists(log_path):
         os.makedirs(log_path)
@@ -87,7 +87,8 @@ if __name__ == '__main__':
         os.makedirs(checkpoint_path)
 
     print('Start training')
-    for i in range(steps):
+    population.steps = resume
+    for i in range(resume, steps):
         recorder.new_step(i + 1)
         population.step(recorder=recorder)
         print(f'step {i + 1}, best fitness: {population.best.fitness} size: {len(population.organisms)}')

@@ -33,6 +33,9 @@ class Recorder:
         self.img_folder = os.path.join(self.folder, str(step))
         self.networks = dict() # organism -> img
         self.step = step
+
+        if os.path.exists(self.img_folder):
+            delete_all_files_in_folder(self.img_folder)
         self._create_folder(self.img_folder)
         with open(self.log_file, 'w') as f:
             f.write('')
