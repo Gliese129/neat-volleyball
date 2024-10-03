@@ -33,7 +33,6 @@ class Population:
 
         self.pool = mp.Pool(mp.cpu_count())
 
-
     def speciate(self):
         self.species = []
         for organism in self.organisms:
@@ -57,7 +56,6 @@ class Population:
             for organism in specie.organisms:
                 train_set.append((organism, self.organisms, specie.organisms, self.fitness_func, self.steps))
                 idx_map[organism.genome_id_] = organism
-
 
         if len(train_set) <= mp.cpu_count():
             results = [self.compute_fitness(train) for train in train_set]
@@ -97,7 +95,7 @@ class Population:
         if population_size <= min_population_size:
             produce_rate = 1 + random.random() * 0.5
         elif population_size >= max_population_size:
-            produce_rate = random.random() * 0.5
+            produce_rate = random.random() * 0.5 + 0.5
         else:
             produce_rate = 1 - scale * random.random()
 
@@ -140,8 +138,8 @@ class Population:
 
         # Control population size
         new_organisms = [organism for organism in new_organisms
-                          if len(organism.input_nodes) == len(self.organisms[0].input_nodes)
-                          and len(organism.output_nodes) == len(self.organisms[0].output_nodes)]
+                         if len(organism.input_nodes) == len(self.organisms[0].input_nodes)
+                         and len(organism.output_nodes) == len(self.organisms[0].output_nodes)]
         if len(new_organisms) > self.max_size:
             new_organisms = new_organisms[:self.max_size]
         self.organisms = new_organisms
@@ -179,4 +177,3 @@ class Population:
             return cls.from_dict(data, fittness_func)
         except FileNotFoundError:
             return None
-

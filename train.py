@@ -13,11 +13,10 @@ from neat.superparams import checkpoint_path, game_step_growth_rate, base_game_s
 input_node_num = 12
 output_node_num = 3
 init_population_size = 100
-steps = 60
-random_pick_size = 4
-resume = 0
+steps = 80
+random_pick_size = 3
+resume = 38
 log_path = './log'
-
 
 
 def gen_init_genomes():
@@ -77,6 +76,8 @@ def init():
 # remove all files
 
 if __name__ == '__main__':
+    input('press enter to start')
+
     init()
     if os.path.exists(log_path):
         delete_all_files_in_folder(log_path)

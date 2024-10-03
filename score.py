@@ -7,7 +7,8 @@ from slime_volleyball.baseline_policy import BaselinePolicy
 from slime_volleyball.slimevolley_env import SlimeVolleyEnv
 import math
 
-
+hit_bonus = 0.3
+distance_bonus = 0.01
 
 
 def ball_is_hit(agent_action, agent_obs):
@@ -51,9 +52,6 @@ def get_score(left: GenomePolicy | Genome, right: GenomePolicy | Genome = None, 
     :param max_step:
     :return:
     """
-    # hit_bonus = 0.02
-    # distance_bonus = 0.01
-
     if type(left) == Genome:
         left = GenomePolicy(left)
     if type(right) == Genome:
@@ -75,7 +73,7 @@ def get_score(left: GenomePolicy | Genome, right: GenomePolicy | Genome = None, 
     left_reward, right_reward = 0, 0
 
     idle_steps = 0
-    max_idle_steps = max_step // 4
+    max_idle_steps = 20
 
     terminateds = truncateds = {"__all__": False}
     while steps <= max_step and not terminateds["__all__"] and not truncateds["__all__"]:
@@ -100,17 +98,25 @@ def get_score(left: GenomePolicy | Genome, right: GenomePolicy | Genome = None, 
             break
 
         # hit ball bonus
-        if ball_is_hit(left_action, obs_left):
-            left_reward += 0.02
-        if ball_is_hit(right_action, obs_right):
-            right_action += 0.02
+        try:
+            if ball_is_hit(left_action, obs_left):
+                left_reward += hit_bonus
+            if ball_is_hit(right_action, obs_right):
+                right_action += hit_bonus
 
-        # distance bonus
-        left_ball_distance = calculate_distance_to_ball(obs_left)
-        left_reward += calculate_close_ball_bonus_exp(left_ball_distance, max_bonus=0.01)
+            # distance bonus
+            left_ball_distance = calculate_distance_to_ball(obs_left)
+            left_reward += calculate_close_ball_bonus_exp(left_ball_distance, max_bonus=distance_bonus)
 
-        right_ball_distance = calculate_distance_to_ball(obs_right)
-        right_reward += calculate_close_ball_bonus_exp(right_ball_distance, max_bonus=0.01)
+            right_ball_distance = calculate_distance_to_ball(obs_right)
+            right_reward += calculate_close_ball_bonus_exp(right_ball_distance, max_bonus=distance_bonus)
+
+            left_reward = float(left_reward)
+            right_reward = float(left_reward)
+        except Exception as e:
+            print(f"Error: {e}\nleft_action: {left_action}, obs_left: {obs_left}\n"
+                  f"left_reward: {left_reward}, right_reward: {right_reward}\n")
+            left_reward, right_reward = 0, 0
 
         left_reward += reward["agent_left"]
         right_reward += reward["agent_right"]
@@ -119,7 +125,7 @@ def get_score(left: GenomePolicy | Genome, right: GenomePolicy | Genome = None, 
     env.close()
 
     if steps <= 100:
-        left_reward, right_reward = -0.1  # game will stop in 100 steps if both take no actions
+        left_reward, right_reward = -0.1, -0.1  # game will stop in 100 steps if both take no actions
 
     # return the score of the right agent
     if swap_left:
