@@ -1,5 +1,3 @@
-import time
-
 import jax.numpy as jnp
 from jax import random
 import jax
@@ -88,43 +86,44 @@ class Individual:
         return levels
 
 
-    def create_child(self, p: HyperParams, innovation_record: jnp.array, generation: int = 0, another: 'Individual' = None) -> ('Individual', jnp.ndarray):
+    def create_child(self, p: HyperParams, innovation_record: jnp.array, generation: int = 0, other: 'Individual' = None) -> ('Individual', jnp.ndarray):
         """
         Create child individual from parent individual
         :param p: HyperParams
         :param innovation_record: innovation record
         :param generation: generation number
-        :param another: another individual for crossover
+        :param other: the other individual for crossover
         :return: child
         """
+        key = random.PRNGKey(0)
         assert innovation_record is not None, "innovation_record is None"
-        if another is None:
+        if other is None:
             child = Individual(self.nodes.copy(), self.genes.copy())
         else:
-            child = self._crossover(another)
-        innovation_record_ =child._mutate(p, innovation_record)
+            child = self._crossover(other, key)
+
+        innovation_record_ =child._mutate(p, innovation_record, key)
         child.generation = generation
 
         return child, innovation_record_
 
-    def _crossover(self, another: 'Individual') -> 'Individual':
+    def _crossover(self, other: 'Individual', key: jnp.ndarray) -> 'Individual':
         """
         Crossover between two individuals
-        Structure is based on self, and genes are randomly selected from another(only common genes)
-        :param another: another individual
+        Structure is based on self, and genes are randomly selected from other(only common genes)
+        Note: different from the original essay, but it is easier to write ? maybe change back later
+        :param other: the other individual
         :return: child
         """
-        key = random.key(int(time.time()))
-
         a_genes = self.genes[0, :]
-        b_genes = another.genes[0, :]
+        b_genes = other.genes[0, :]
         _, a_common_idx, b_common_idx = jnp.intersect1d(a_genes, b_genes, return_indices=True)
 
         b_select_prob = 0.5
         select_mask = random.uniform(key, shape=(len(b_common_idx),)) < b_select_prob
 
         new_genes = jnp.copy(self.genes)
-        new_genes[3, a_common_idx[select_mask]] = another.genes[3, b_common_idx[select_mask]]
+        new_genes[3, a_common_idx[select_mask]] = other.genes[3, b_common_idx[select_mask]]
         new_nodes = jnp.copy(self.nodes)
 
         child = Individual(new_nodes, new_genes)
@@ -158,12 +157,12 @@ class Individual:
 
         # mutate add node
         key, subkey = random.split(key)
-        if random.uniform(subkey) < p.mutation_rate:
+        if random.uniform(subkey) < p.mutate_add_node_rate:
             innovation_record = self._mutate_add_node(p, innovation_record, key)
         # mutate add connection
         key, subkey = random.split(key)
-
-
+        if random.uniform(subkey) < p.mutate_add_edge_rate:
+            innovation_record = self._mutate_add_connection(p, innovation_record, key)
         return innovation_record
 
     def _mutate_add_connection(self, p: HyperParams, innovation_record: jnp.ndarray, key: jnp.ndarray) -> jnp.ndarray:
@@ -192,10 +191,13 @@ class Individual:
         key, subkey = random.split(key)
         conn_idx = random.choice(subkey, valid_connections.shape[0])
         selected_conn = valid_connections[conn_idx]
-
-
-
-
+        # add selected connection
+        new_gene = jnp.array([len(innovation_record), selected_conn[0], selected_conn[1]])
+        innovation_record = jnp.stack([innovation_record, new_gene], axis=1)
+        key, subkey = random.split(key)
+        new_connection = jnp.array([conn_idx, selected_conn[0], selected_conn[1], random.uniform(subkey), 1])
+        self.genes = jnp.append(self.genes, new_connection, axis=0)
+        return innovation_record
 
     def _mutate_add_node(self, p: HyperParams, innovation_record: jnp.ndarray, key: jnp.ndarray) -> jnp.ndarray:
         """
@@ -225,10 +227,48 @@ class Individual:
         innovation_record = jnp.concatenate((innovation_record, new_conn_s[:, None], new_conn_d[:, None]), axis=1)
         return innovation_record
 
+    def distance(self, other: 'Individual', p: HyperParams) -> float:
+        """
+        Return distance between two individuals.
+        Given by the formula: delta = (c1*E + c2*D) / N + c3*W_avg
+        """
+        # Get innovation numbers
+        a_innovs = self.genes[0, :]
+        b_innovs = other.genes[0, :]
 
+        # Matching genes (common innovation numbers)
+        common_innovs = jnp.intersect1d(a_innovs, b_innovs)
+        a_only_innovs = jnp.setdiff1d(a_innovs, b_innovs, assume_unique=False)
+        b_only_innovs = jnp.setdiff1d(b_innovs, a_innovs, assume_unique=False)
 
+        find_index = lambda array, val: jnp.argmax(array ==val)
 
+        if common_innovs.size > 0:
+            a_idx = jax.vmap(lambda x: find_index(a_innovs, x))(common_innovs)
+            b_idx = jax.vmap(lambda x: find_index(b_innovs, x))(common_innovs)
+            a_w = self.genes[3, a_idx]
+            b_w = other.genes[3, b_idx]
+            W_avg = jnp.mean(jnp.abs(a_w - b_w))
+        else:
+            W_avg = 0.0
 
+        # Disjoint + Excess genes
+        max_common = jnp.minimum(jnp.max(a_innovs), jnp.max(b_innovs))
 
+        # excess
+        a_excess = jnp.sum(a_only_innovs > max_common)
+        b_excess = jnp.sum(b_only_innovs > max_common)
+        E = a_excess + b_excess
+
+        # disjoint
+        D = (a_only_innovs.size + b_only_innovs.size) - E
+
+        # Normalize
+        N = jnp.maximum(a_innovs.size, b_innovs.size)
+        N = jnp.where(N < 20, 1, N)  # if N<20, then N=1
+
+        dist = (p.c1 * E + p.c2 * D) / N + p.c3 * W_avg
+
+        return dist.item()
 
 

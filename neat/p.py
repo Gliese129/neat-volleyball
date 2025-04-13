@@ -13,12 +13,18 @@ class HyperParams:
     enable_rate: float = 0.2
     mutate_weight_rate: float = 0.7
     mutate_activation_rate: float = 0.3
+    mutate_add_node_rate: float = 0.3
+    mutate_add_edge_rate: float = 0.3
 
     elite_ratio: float = 0.2
 
     specie_threshold: float = 0.2
     speciate_gene_coefficient: float = 0.5
     speciate_weight_coefficient: float = 0.5
+
+    c1: float = 1.0
+    c2: float = 1.0
+    c3: float = 0.4
 
 
 activation_functions = [
