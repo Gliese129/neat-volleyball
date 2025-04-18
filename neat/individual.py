@@ -6,6 +6,13 @@ from .p import HyperParams, activation_functions
 
 class Individual:
     """
+    Definitions:
+        N: number of nodes
+        M: number of connections
+        N_all: number of all nodes
+        E: number of excess genes
+        D: number of disjoint genes
+        W: weight genes
     Attributes:
         nodes: node genes (jnp array)
         genes: edge genes (jnp array)
@@ -28,7 +35,7 @@ class Individual:
                     - [0, :] == Node ID
                     - [1, :] == Node Type (1=input, 2=output, 3=hidden, 4=bias)
                     - [2, :] == Activation Function ID
-        :param genes: [5 * N]
+        :param genes: [5 * M]
                     - [0, :] == Innovation Number
                     - [1, :] == Source Node ID
                     - [2, :] == Destination Node ID
@@ -49,7 +56,7 @@ class Individual:
     @property
     def adj_matrix(self) -> jnp.ndarray:
         """
-        :return: adjacency matrix[N * N]
+        :return: adjacency matrix[N_all * N_all]
         """
         node_cnt = jnp.max(self.nodes[0, :]) + 1
         result = jnp.zeros((node_cnt, node_cnt), dtype=jnp.float32)
@@ -63,7 +70,7 @@ class Individual:
 
     def get_node_levels(self) -> jnp.ndarray:
         """
-        :return: node levels[N]
+        :return: node levels[N_all]
         """
         adj_matrix = self.adj_matrix
         node_cnt = adj_matrix.shape[0]
@@ -271,4 +278,50 @@ class Individual:
 
         return dist.item()
 
+    def predict(self, inputs: jnp.ndarray) -> jnp.ndarray:
+        """
+
+        :param inputs: a flat array of input values
+        :return: a flat array of output values
+        """
+        adj_matrix = self.adj_matrix
+        node_ids = self.nodes[0, :].astype(jnp.int32)
+        node_types = self.nodes[1, :].astype(jnp.int32)
+        node_activations = self.nodes[2, :].astype(jnp.int32)
+
+        # Initialize node values
+        n_max = jnp.max(node_ids) + 1
+        result = jnp.zeros(n_max, dtype=jnp.float32)
+
+        # Find input nodes and bias nodes
+        input_nodes = node_ids[node_types == 1]
+        bias_nodes = node_ids[node_types == 4]
+
+        assert inputs.shape[0] == input_nodes.shape[0], "Input size does not match input nodes"
+
+        # set bias
+        result = result.at[bias_nodes].set(1.0)
+        # set input
+        result = result.at[input_nodes].set(inputs)
+
+        levels = self.get_node_levels()  # node id -> node level
+        sorted_idx = jnp.argsort(levels)  # sort by node level
+
+        for idx in sorted_idx:
+            if levels[idx] < 0:
+                continue
+            node_id = node_ids[idx]
+            node_type = node_types[idx]
+            activation = activation_functions[node_activations[idx]]
+            if node_type in (2, 3):  # output or hidden node
+                # Get incoming connections
+                parents = jnp.where(adj_matrix[:, node_id] != 0)[0]
+                weights = adj_matrix[parents, node_id]
+                inputs = result[parents]
+                # Apply activation function
+                result = result.at[node_id].set(activation(jnp.dot(weights, inputs)))
+
+        output_mask = node_ids[node_types == 2]
+        output = result[output_mask]
+        return output
 

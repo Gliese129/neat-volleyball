@@ -1,6 +1,5 @@
 import numpy as np
 
-
 class BaselinePolicy:
     """Tiny RNN policy with only 120 parameters of otoro.net/slimevolley agent"""
 

@@ -7,7 +7,7 @@ from slimevolleygym.slimevolley_boost_env import SlimeVolleyBoostEnv
 # from slime_volleyball.baseline_policy import BaselinePolicy
 
 
-BOOST_MODE = True
+BOOST_MODE = False
 
 
 if __name__ == "__main__":
