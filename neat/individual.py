@@ -1,3 +1,5 @@
+import json
+
 import jax.numpy as jnp
 from jax import random
 import jax
@@ -129,9 +131,9 @@ class Individual:
         b_select_prob = 0.5
         select_mask = random.uniform(key, shape=(len(b_common_idx),)) < b_select_prob
 
-        new_genes = jnp.copy(self.genes)
-        new_genes[3, a_common_idx[select_mask]] = other.genes[3, b_common_idx[select_mask]]
         new_nodes = jnp.copy(self.nodes)
+        new_genes = jnp.copy(self.genes) \
+                    .at[3, a_common_idx[select_mask]].set(other.genes[3, b_common_idx[select_mask]])
 
         child = Individual(new_nodes, new_genes)
 
@@ -148,19 +150,23 @@ class Individual:
         disabled_genes = (jnp.where(self.genes[4, :] == 0))[0]
         key, subkey = random.split(key)
         enable_mask = random.uniform(subkey, shape=(len(disabled_genes),)) < p.enable_rate
-        self.genes[4, disabled_genes[enable_mask]] = 1
+        self.genes = self.genes.at[4, disabled_genes[enable_mask]].set(1)
 
         # mutate weight
+        n_connections = self.genes.shape[1]
         key, subkey = random.split(key)
-        weight_mask = random.uniform(subkey, shape=(self.conn_cnt,)) < p.mutate_weight_rate
+        weight_mask = random.uniform(subkey, shape=(n_connections,)) < p.mutate_weight_rate
         key, subkey = random.split(key)
-        self.genes[3, weight_mask] = random.uniform(subkey, shape=(self.conn_cnt,)) * 2 - 1 # allow negative weight
+        self.genes = self.genes.at[3, weight_mask].set(random.uniform(subkey, shape=(weight_mask.sum().item(),)) * 2 - 1) # allow negative weight
 
         # mutate activation function ? maybe not needed
+        n_nodes = self.nodes.shape[1]
         key, subkey = random.split(key)
-        activation_mask = random.uniform(subkey, shape=(self.conn_cnt,)) < p.mutate_activation_rate
+        activation_mask = random.uniform(subkey, shape=(n_nodes,)) < p.mutate_activation_rate
         key, subkey = random.split(key)
-        self.nodes[2, activation_mask] = random.randint(subkey, shape=(self.conn_cnt,), minval=0, maxval=len(activation_functions))
+        self.nodes = self.nodes.at[2, activation_mask].set(
+            random.randint(subkey, shape=(activation_mask.sum().item(),), minval=0, maxval=len(activation_functions) - 1) # allow negative weight
+        )
 
         # mutate add node
         key, subkey = random.split(key)
@@ -183,7 +189,8 @@ class Individual:
         node_levels = self.get_node_levels()
         # generate all possible connections
         exist_nodes = self.nodes[0, :].astype(jnp.int32).tolist()
-        exist_nodes = jnp.ndarray(set(exist_nodes))
+        exist_nodes = list(set(exist_nodes))
+        exist_nodes = jnp.array(exist_nodes)
         levels = node_levels[exist_nodes]
         cmp_mask = jnp.expand_dims(levels, axis=1) <= jnp.expand_dims(levels, axis=0)
         idx_mask = jnp.expand_dims(exist_nodes, axis=1) != jnp.expand_dims(exist_nodes, axis=0)
@@ -192,18 +199,30 @@ class Individual:
         valid_connections = jnp.stack([exist_nodes[valid_idx[0]], exist_nodes[valid_idx[1]]], axis=1)
         # get all connections
         all_connections = self.genes[1:3, :].T
+
         # remove existing connections
-        valid_connections = jnp.setdiff1d(valid_connections, all_connections, assume_unique=True)
+        max_node_id = jnp.max(self.nodes[0, :]) + 1  # e.g. 201
+        def flatten_pairs(arr):
+            return arr[:, 0] * max_node_id + arr[:, 1]
+        valid_codes = flatten_pairs(valid_connections)  # shape (N,)
+        all_codes = flatten_pairs(all_connections)
+        # ----- 1‑D set difference -----
+        unique_codes = jnp.setdiff1d(valid_codes, all_codes, assume_unique=True)
+        # ----- decode back to 2‑D (src, dst) -----
+        src = unique_codes // max_node_id
+        dst = unique_codes % max_node_id
+        valid_connections = jnp.stack([src, dst], axis=1)  # shape (M,2)
+
         # select random connection
         key, subkey = random.split(key)
         conn_idx = random.choice(subkey, valid_connections.shape[0])
         selected_conn = valid_connections[conn_idx]
         # add selected connection
         new_gene = jnp.array([len(innovation_record), selected_conn[0], selected_conn[1]])
-        innovation_record = jnp.stack([innovation_record, new_gene], axis=1)
+        innovation_record = jnp.concatenate([innovation_record, new_gene[:, None]], axis=1)
         key, subkey = random.split(key)
         new_connection = jnp.array([conn_idx, selected_conn[0], selected_conn[1], random.uniform(subkey), 1])
-        self.genes = jnp.append(self.genes, new_connection, axis=0)
+        self.genes = jnp.concatenate([self.genes, new_connection[:, None]], axis=1)
         return innovation_record
 
     def _mutate_add_node(self, p: HyperParams, innovation_record: jnp.ndarray, key: jnp.ndarray) -> jnp.ndarray:
@@ -325,3 +344,40 @@ class Individual:
         output = result[output_mask]
         return output
 
+    def __str__(self):
+        return f"Individual(fitness={self.fitness}, rank={self.rank}, generation={self.generation}, specie={self.specie})"
+
+    def to_json(self):
+        """
+        Convert individual to json
+        :return: json string
+        """
+        return {
+            "nodes": self.nodes.tolist(),
+            "genes": self.genes.tolist(),
+            "fitness": self.fitness,
+            "rank": self.rank if hasattr(self, "rank") else -1,
+            "generation": self.generation,
+            "specie": self.specie if hasattr(self, "specie") else -1,
+        }
+
+    @classmethod
+    def from_json(cls, json_str):
+        """
+        Convert json to individual
+        :param json_str: json string
+        :return: individual
+        """
+        data = json.loads(json_str)
+        nodes = jnp.array(data["nodes"])
+        genes = jnp.array(data["genes"])
+        fitness = data["fitness"]
+        rank = data["rank"]
+        generation = data["generation"]
+        specie = data["specie"]
+        individual = cls(nodes, genes)
+        individual.fitness = fitness
+        individual.rank = rank
+        individual.generation = generation
+        individual.specie = specie
+        return individual

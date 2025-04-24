@@ -23,12 +23,12 @@ def nsga_sort(objs: jnp.ndarray, return_front=False) -> Union[jnp.ndarray, Tuple
 
     # Sort the individuals in each front
     for i in range(len(fronts)):
-        front_objs = objs[fronts[i]]
+        front_objs = objs[jnp.array(fronts[i])]
         crowd_dist = get_crowd_dist(front_objs)
         front_rank = jnp.argsort(-crowd_dist) # large crowd distance means more space for the individual
         fronts[i] = [fronts[i][j] for j in front_rank]
     # Convert to rank
-    sorted_id = [i for front in fronts for i in front]
+    sorted_id = jnp.array([i for front in fronts for i in front])
     rank = jnp.zeros_like(objs[:, 0])
     rank = rank.at[sorted_id].set(jnp.arange(len(sorted_id)))
     if return_front:
@@ -95,7 +95,9 @@ def get_crowd_dist(objs: jnp.ndarray) -> jnp.ndarray:
         obj = objs[:, i]
         key = jnp.argsort(obj)
 
-        crowd_dist = jnp.zeros_like(obj).at[(key[0], key[-1])].set(jnp.inf)
+        crowd_dist = jnp.zeros_like(obj) \
+                        .at[key[0]].set(jnp.inf) \
+                        .at[key[-1]].set(jnp.inf)
         norm = obj[key[-1]] - obj[key[0]]
         if norm > 0:
             dists = (obj[key[2:]] - obj[key[:-2]]) / norm

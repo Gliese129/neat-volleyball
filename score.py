@@ -4,10 +4,13 @@ from typing import Union
 import jax
 import jax.numpy as jnp
 from jax import random
+from tqdm.contrib.concurrent import thread_map
 
 from neat import Individual
 from policy import BasePolicy
 from slimevolleygym.slimevolley_env import SlimeVolleyEnv
+
+frame_skip = 4
 
 
 def score_one(left_agent: BasePolicy, right_agent: BasePolicy, key: jnp.ndarray):
@@ -17,22 +20,25 @@ def score_one(left_agent: BasePolicy, right_agent: BasePolicy, key: jnp.ndarray)
     })
 
     key, subkey = random.split(key)
-    obs, _ = env.reset(seed=random.randint(shape=(1, ), key=subkey, minval=0, maxval=10000).item())
+    seed = int(jax.device_get(random.randint(shape=(), key=subkey, minval=0, maxval=10000)))
+    obs, _ = env.reset(seed=seed)
     steps = 0
     total_reward = {"agent_right": 0, "agent_left": 0}
 
     terminateds = truncateds = {"__all__": False}
-    while not terminateds["__all__"] and not truncateds["__all__"] and steps < 30000:
-        obs_left, obs_right = obs["agent_left"], obs["agent_right"]
+    while not terminateds["__all__"] and not truncateds["__all__"] and steps < 3000:
+        obs_left, obs_right = obs["agent_left"]['obs'], obs["agent_right"]['obs']
         action = {
             "agent_left": left_agent(obs_left),
             "agent_right": right_agent(obs_right),
         }
-        obs, reward, terminateds, truncateds, _ = env.step(action)
-        total_reward["agent_left"] += reward["agent_left"]
-        total_reward["agent_right"] += reward["agent_right"]
-        steps += 1
-
+        for _ in range(frame_skip):
+            obs, reward, terminateds, truncateds, _ = env.step(action)
+            total_reward["agent_left"] += reward["agent_left"]
+            total_reward["agent_right"] += reward["agent_right"]
+            steps += 1
+            if terminateds["__all__"] or truncateds["__all__"]:
+                break
     env.close()
     return total_reward["agent_left"], total_reward["agent_right"]
 
@@ -44,8 +50,7 @@ def score_batch(
     def score_fn(i):
         left_agent, right_agent = batches[i]
         return score_one(left_agent, right_agent, keys[i])
-    with ThreadPoolExecutor(max_workers=16) as executor:
-        results = list(executor.map(score_fn, range(len(batches))))
+    results = thread_map(score_fn, range(len(batches)), max_workers=16)
     return results
 
 
@@ -53,7 +58,7 @@ def score(
     agents: list[Individual],
     key: jnp.ndarray,
     sample_num: int = 2,
-    score_method: Union['fitness', 'point'] = "fitness",
+    score_method: str = "reward",
 ) -> jnp.ndarray:
     assert len(agents) > 0, "No agents to score."
     assert sample_num > 0, "Sample num must be greater than 0."
@@ -70,7 +75,7 @@ def score(
         right_ids = random.choice(sample_keys[i], len(agents), shape=(sample_num,), replace=False)
         for j in right_ids:
             batches.append((i, int(j)))
-            keys.append(random.PRNGKey(i * 1000 + int(j)))  # 随便搞个 key
+            keys.append(random.PRNGKey(i * 1000 + int(j)))
 
     match_pairs = [(agents[i], agents[j]) for i, j in batches]
     results = score_batch(match_pairs, jnp.array(keys))
@@ -95,9 +100,9 @@ def score(
     counts = jnp.where(counts == 0, 1, counts)
     scores = scores / counts
 
-    if score_method == "fitness":
+    if score_method == "reward":
         return scores
     elif score_method == "point":
         return points
     else:
-        raise ValueError("score_method must be 'fitness' or 'point'.")
+        raise ValueError("score_method must be 'reward' or 'point'.")

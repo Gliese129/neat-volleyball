@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from . import Individual
-from .neat import Neat # TODO: remove this when running to avoid circular import
+# from .neat import Neat # TODO: remove this when running to avoid circular import
 import jax.numpy as jnp
 
 
@@ -24,6 +24,38 @@ class Specie:
         self.best_fitness = represent.fitness
         self.last_improvement_elapsed = 0
         self.offspring_num = 0
+
+    def to_json(self):
+        """
+        Convert the Specie object to a JSON-compatible dictionary.
+        """
+        return {
+            'represent': self.represent.to_json(),
+            'members': [member.to_json() for member in self.members],
+            'best_individual': self.best_individual.to_json(),
+            'best_fitness': self.best_fitness,
+            'last_improvement_elapsed': self.last_improvement_elapsed,
+            'offspring_num': self.offspring_num,
+        }
+
+    @classmethod
+    def from_json(cls, json_data):
+        """
+        Create a Specie object from a JSON-compatible dictionary.
+        """
+        represent = Individual.from_json(json_data['represent'])
+        members = [Individual.from_json(member) for member in json_data['members']]
+        best_individual = Individual.from_json(json_data['best_individual'])
+        best_fitness = json_data['best_fitness']
+        last_improvement_elapsed = json_data['last_improvement_elapsed']
+        offspring_num = json_data['offspring_num']
+        specie = cls(represent)
+        specie.members = members
+        specie.best_individual = best_individual
+        specie.best_fitness = best_fitness
+        specie.last_improvement_elapsed = last_improvement_elapsed
+        specie.offspring_num = offspring_num
+        return specie
 
 
 def speciate(self: 'Neat'):

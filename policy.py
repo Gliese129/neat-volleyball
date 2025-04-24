@@ -16,7 +16,7 @@ class BasePolicy(ABC):
         :param obs: The observation from a specific agent.
         :return: The action to be taken.
         """
-        obs = jnp.ndarray(obs)
+        obs = jnp.array(obs)
         action = self.model.predict(obs)
         return action.tolist()
 

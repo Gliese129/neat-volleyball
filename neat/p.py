@@ -3,50 +3,63 @@ import jax.numpy as jnp
 
 @dataclass
 class HyperParams:
-    """Hyperparameters for NEAT algorithm."""
-    population_size: int = 100
-    max_generations: int = 1000
+    # ========== Evolution scale ==========
+    population_size: int = 150          # individuals per generation
+    max_generations: int = 400          # training budget
 
-    input_size: int = 8
-    output_size: int = 3
-    init_activation: int = 0 # sigmoid as default activation function
-    init_enabled_prob: float = 0.5 # probability of a connection being enabled
+    # ========== Network topology ==========
+    input_size: int = 12                 #
+    output_size: int = 3                # move‑left, move‑right, jump
+    init_activation: int = 2            # 0:Sigmoid,1:Tanh,2:ReLU,3:LeakyReLU
+    init_enabled_prob: float = 0.80     # initial probability a connection is enabled
 
+    # ========== Speciation ==========
     use_speciation: bool = True
-    min_speciate_threshold: float = 2.0
-    speciate_threshold_movement: float = 0.25
-    ideal_species: int = 4
-    stagnation_limit: int = 4 # number of generations without improvement
+    min_speciate_threshold: float = 1.5 # lower bound on compatibility threshold
+    speciate_threshold_movement: float = 0.20  # step size to approach ideal_species
+    ideal_species: int = 5              # target number of species
+    stagnation_limit: int = 6           # generations without improvement before “stagnant”
 
-    use_dominated_sorting_prob: float = 0.5 # probability of using dominated sorting
+    # ========== Ranking method ==========
+    use_dominated_sorting_prob: float = 0.30   # chance to switch to NSGA‑II sorting
 
-    # possibility of mutation
-    crossover_rate: float = 0.5
-    mutation_rate: float = 0.3
-    enable_rate: float = 0.2
-    mutate_weight_rate: float = 0.7
-    mutate_activation_rate: float = 0.3
-    mutate_add_node_rate: float = 0.3
-    mutate_add_edge_rate: float = 0.3
+    # ========== Mutation / Crossover probabilities ==========
+    crossover_rate: float = 0.75
+    mutation_rate: float  = 0.25       # not used directly here, but handy for wrappers
+    enable_rate: float    = 0.20
+    mutate_weight_rate: float = 0.80
+    mutate_activation_rate: float = 0.10
+    mutate_add_node_rate: float = 0.20
+    mutate_add_edge_rate: float = 0.40
 
-    # possibility of crossover
-    elite_ratio: float = 0.2
-    cull_ratio: float = 0.2
-    rolling_num: int = 5 # number of parents to select for crossover
+    # ========== Elitism & Cull ==========
+    elite_ratio: float = 0.10          # top fraction copied unchanged
+    cull_ratio:  float = 0.40          # worst fraction removed before breeding
+    rolling_num: int = 5               # tournament size when selecting parents
 
-    specie_threshold: float = 0.2
-    speciate_gene_coefficient: float = 0.5
-    speciate_weight_coefficient: float = 0.5
+    # ========== Compatibility coefficients (distance = c1*E+c2*D+c3*W̄) ==========
+    c1: float = 1.0                    # excess genes
+    c2: float = 1.0                    # disjoint genes
+    c3: float = 0.4                    # average weight difference
 
-    c1: float = 1.0
-    c2: float = 1.0
-    c3: float = 0.4
+    def to_json(self):
+        """
+        Convert the HyperParams object to a JSON serializable dictionary.
+        """
+        return {k: v for k, v in self.__dict__.items() if not k.startswith('__')}
+
+    @classmethod
+    def from_json(cls, json_data):
+        """
+        Create a HyperParams object from a JSON serializable dictionary.
+        """
+        return cls(**json_data)
 
 
+# ---------- Activation‑function lookup table ----------
 activation_functions = [
-    lambda x: 1 / (1 + jnp.exp(-x)), # sigmoid
-    lambda x: jnp.tanh(x), # tanh
-    lambda x: jnp.maximum(0, x), # ReLU
-    lambda x: jnp.maximum(-1, x), # Leaky ReLU
+    lambda x: 1 / (1 + jnp.exp(-x)),          # 0: Sigmoid
+    lambda x: jnp.tanh(x),                    # 1: Tanh
+    lambda x: jnp.maximum(0, x),              # 2: ReLU
+    lambda x: jnp.where(x > 0, x, 0.01 * x)   # 3: Leaky‑ReLU (slope = 0.01)
 ]
-

@@ -52,7 +52,7 @@ class Neat:
         Update the fitness of the population based on the rewards received.
         """
         for i, individual in enumerate(self.population):
-            individual.fitness += rewards[i]
+            individual.fitness = rewards[i].item()
 
     def ask(self):
         """
@@ -88,18 +88,18 @@ class Neat:
             rank = jnp.argsort(fitness)
         # Assign ranks to individuals
         for i, individual in enumerate(self.population):
-            individual.rank = rank[i]
+            individual.rank = rank[i].item()
 
     def evolve(self):
         """ Evolves new population from existing species.
             Wrapper which calls 'recombine' on every species and combines all offspring into a new population. When speciation is not used, the entire population is treated as a single species.
         """
         new_pop = []
+        self.generation += 1
         for i in range(len(self.species)):
             children, self.innovation_record = self.recombine(self.species[i], self.innovation_record, self.generation,
                                                               key=random.PRNGKey(i))
             new_pop.append(children)
-        self.generation += 1
         self.population = [child for specie in new_pop for child in specie]
 
     def recombine(self, specie: Specie, innovation_record: jnp.ndarray, generation: int, key: jnp.ndarray):
@@ -154,11 +154,11 @@ class Neat:
         nodes = jnp.zeros((3, p.input_size + p.output_size + 1), dtype=jnp.int32)
         nodes = nodes.at[0, :].set(node_ids)
         # node types
-        nodes[1, 0] = 4 # bias
-        nodes[1, 1:(p.input_size + 1)] = 1 # input
-        nodes[1, (p.input_size + 1):] = 2 # output
+        nodes = nodes.at[1, 0].set(4) \
+                     .at[1, 1:(p.input_size + 1)].set(1) \
+                     .at[1, (p.input_size + 1):].set(2)
         # activation functions
-        nodes[2, :] = p.init_activation
+        nodes = nodes.at[2, :].set(p.init_activation)
 
         # connections
         n_connections = (p.input_size + 1) * p.output_size # input+bias to output
@@ -184,6 +184,7 @@ class Neat:
             connections_ = connections_.at[3, :].set(weights)
             connections_ = connections_.at[4, :].set(enabled)
             new_individual = Individual(nodes.copy(), connections_.copy())
+            new_individual.generation = 0
             population.append(new_individual)
 
         # Create innovation record
@@ -192,3 +193,31 @@ class Neat:
 
         self.population = population
         self.innovation_record = innovation_record
+
+    def to_json(self):
+        """
+        Convert the NEAT object to a JSON serializable format.
+        """
+        return {
+            "population": [ind.to_json() for ind in self.population],
+            "species": [specie.to_json() for specie in self.species],
+            "generation": self.generation,
+            "innovation_record": self.innovation_record.tolist(),
+            "species_threshold": self.species_threshold,
+            "p": self.p.to_json(),
+        }
+
+    @classmethod
+    def from_json(cls, json_str):
+        """
+        Create a NEAT object from a JSON serializable format.
+        """
+        data = json_str
+        p = HyperParams.from_json(data["p"])
+        neat = cls(p)
+        neat.generation = data["generation"]
+        neat.species_threshold = data["species_threshold"]
+        neat.innovation_record = jnp.array(data["innovation_record"])
+        neat.population = [Individual.from_json(ind) for ind in data["population"]]
+        neat.species = [Specie.from_json(specie) for specie in data["species"]]
+        return neat
