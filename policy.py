@@ -20,6 +20,10 @@ class BasePolicy(ABC):
         action = self.model.predict(obs)
         return action.tolist()
 
+    def get_forward_function(self):
+        self.model.express()
+        return self.model.compiled_forward
+
     def __call__(self, *args, **kwargs):
         return self.get_action(*args, **kwargs)
 

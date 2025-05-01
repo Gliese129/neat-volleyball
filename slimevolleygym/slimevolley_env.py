@@ -18,6 +18,7 @@ import gymnasium as gym
 from gymnasium import spaces
 from gymnasium.envs.registration import register
 import numpy as np
+import jax.numpy as jnp
 import cv2  # installed with gym anyways
 
 from .core import constants
@@ -84,7 +85,7 @@ class SlimeVolleyEnv(gym.Env):
 
     default_config = {
         "from_pixels": False,
-        "survival_reward": False,
+        "survival_reward": True,
         "max_steps": 3000,
         # if true, LHS actions are swapped to be intuitive for humans, otherwise directions are swapped
         "human_inputs": False,
@@ -194,6 +195,8 @@ class SlimeVolleyEnv(gym.Env):
         # convert discrete action n into the actual triplet action
         if n is None:
             return n
+        if isinstance(n, jnp.ndarray):
+            n = np.array(n)
         if isinstance(
             n, (list, tuple, np.ndarray)
         ):  # original input for some reason, just leave it:
@@ -236,14 +239,13 @@ class SlimeVolleyEnv(gym.Env):
         survival_reward = 0.01 if self.survival_reward else 0.0
 
         # include survival bonus
-        rewards = {
-            "agent_left": -reward_right + survival_reward,
-            "agent_right": reward_right + survival_reward,
-        }
+        rewards = reward_right + survival_reward
 
         obs = self.get_obs()
 
         terminateds, truncateds = self.get_terminateds_truncateds()
+
+        terminateds, truncateds = terminateds["__all__"], truncateds["__all__"]
 
         return obs, rewards, terminateds, truncateds, {}
 

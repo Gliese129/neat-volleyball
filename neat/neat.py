@@ -165,7 +165,7 @@ class Neat:
         inputs = jnp.arange(p.input_size + 1)
         outputs = jnp.arange(p.input_size + 1, p.input_size + 1 + p.output_size)
 
-        connections = jnp.zeros((5, n_connections), dtype=jnp.int32)
+        connections = jnp.zeros((5, n_connections), dtype=jnp.float32)
         connections = connections.at[0, :].set(jnp.arange(n_connections)) # innovation id
         connections = connections.at[1, :].set(jnp.tile(inputs, p.output_size)) # source node
         connections = connections.at[2, :].set(jnp.repeat(outputs, p.input_size + 1)) # target node

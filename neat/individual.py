@@ -27,6 +27,7 @@ class Individual:
     rank: int
     generation: int
     specie: int
+    compiled_forward: callable
 
     def __init__(self, nodes: jnp.ndarray, genes: jnp.ndarray):
         """ Initialize individual with given genes
@@ -81,13 +82,13 @@ class Individual:
         types = jnp.zeros(node_cnt, dtype=jnp.int32)
         types = types.at[self.nodes[0, :].astype(jnp.int32)].set(self.nodes[1, :].astype(jnp.int32))
 
-        init_levels = jnp.where((types == 1) | (types == 4), 0.0, -1e9)
+        init_levels = jnp.where((types == 1) | (types == 4), 0, -1e9).astype(jnp.int32)
 
         def body_fn(levels, _):
             mask = adj_matrix != 0
-            candidate_matrix = jnp.where(mask, levels[:, None] + 1.0, -1e9)
-            new_levels = jnp.max(candidate_matrix, axis=0)
-            new_levels = jnp.where((types == 1) | (types == 4), 0.0, new_levels)
+            candidate_matrix = jnp.where(mask, levels[:, None] + 1, -1e9)
+            new_levels = jnp.max(candidate_matrix, axis=0).astype(jnp.int32)
+            new_levels = jnp.where((types == 1) | (types == 4), 0, new_levels)
             levels = jnp.maximum(levels, new_levels)
             return levels, None
 
@@ -297,52 +298,90 @@ class Individual:
 
         return dist.item()
 
+    def express(self, force_recompile: bool = False) -> None:
+        """
+        Compile individual node forward path once
+        :return:
+        """
+        if not force_recompile and hasattr(self, "compiled_forward"):
+            return self.compiled_forward
+        # 1.  topological sort
+        order = jnp.argsort(self.get_node_levels())
+        node_id_to_idx = dict(zip(self.nodes[0, :].tolist(), order.tolist()))
+
+        # 2.  build parents index & weight list
+        src, dst = self.genes[1:3, self.genes[4, :] == 1]  # enabled edges
+        w = self.genes[3, self.genes[4, :] == 1]
+
+        # parents_per_node: list of (idx_in_order, weight)
+        parents: list[list[tuple[int, float]]] = [[] for _ in range(order.size)]
+        for s, d, weight in zip(src, dst, w):
+            s, d, weight = int(s), int(d), float(weight)
+            parents[node_id_to_idx[d]].append((node_id_to_idx[s], weight))
+
+        # pack into ragged arrays
+        max_par = max(len(p) for p in parents)
+        idx_mat = -jnp.ones((len(parents), max_par), jnp.int32)
+        w_mat = jnp.zeros((len(parents), max_par), jnp.float32)
+        for i, plist in enumerate(parents):
+            if plist:
+                idx, ww = zip(*plist)
+                idx_mat = idx_mat.at[i, :len(idx)].set(jnp.array(idx))
+                w_mat = w_mat.at[i, :len(ww)].set(jnp.array(ww))
+
+        act_table = jnp.array(self.nodes[2, order], jnp.int32)
+        node_type = jnp.array(self.nodes[1, order], jnp.int32)
+
+        bias_idx = jnp.where((node_type == 4))[0]
+        input_idx = jnp.where((node_type == 1))[0]
+        out_idx = jnp.where(node_type == 2)[0]
+
+        # ---------- define pure JAX forward ----------
+        def _forward(x: jnp.ndarray):  # [input_size]
+            values = jnp.zeros((order.size,), jnp.float32)
+            values = values.at[bias_idx].set(1.0)
+            values = values.at[input_idx].set(x)
+
+            def body(v, i):
+                def compute(v):
+                    p_idx = idx_mat[i]  # shape (max_in,)
+                    w_row = w_mat[i]  # weight
+                    mask = p_idx >= 0  # True for valid parent
+                    parent_vals = jnp.where(mask, v[p_idx], 0.0)
+                    dot = (w_row * parent_vals).sum()
+                    act = jax.lax.switch(
+                        act_table[i],
+                        activation_functions,
+                        dot
+                    )
+                    return v.at[i].set(act)
+
+                v = jax.lax.cond(
+                    (node_type[i] == 2) | (node_type[i] == 3),
+                    compute,
+                    lambda v: v,  # skip if input/bias
+                    v
+                )
+                return v, None
+
+            values, _ = jax.lax.scan(body, values, jnp.arange(order.size))
+            return values[out_idx]  # shape [output_size]
+
+        # self.compiled_forward = jax.jit(_forward)  # compiled function
+        self.compiled_forward = _forward  # compiled function
+
     def predict(self, inputs: jnp.ndarray) -> jnp.ndarray:
         """
 
         :param inputs: a flat array of input values
         :return: a flat array of output values
         """
-        adj_matrix = self.adj_matrix
-        node_ids = self.nodes[0, :].astype(jnp.int32)
-        node_types = self.nodes[1, :].astype(jnp.int32)
-        node_activations = self.nodes[2, :].astype(jnp.int32)
+        if not hasattr(self, "compiled_forward"):
+            self.express()
+        return self.compiled_forward(inputs)
 
-        # Initialize node values
-        n_max = jnp.max(node_ids) + 1
-        result = jnp.zeros(n_max, dtype=jnp.float32)
-
-        # Find input nodes and bias nodes
-        input_nodes = node_ids[node_types == 1]
-        bias_nodes = node_ids[node_types == 4]
-
-        assert inputs.shape[0] == input_nodes.shape[0], "Input size does not match input nodes"
-
-        # set bias
-        result = result.at[bias_nodes].set(1.0)
-        # set input
-        result = result.at[input_nodes].set(inputs)
-
-        levels = self.get_node_levels()  # node id -> node level
-        sorted_idx = jnp.argsort(levels)  # sort by node level
-
-        for idx in sorted_idx:
-            if levels[idx] < 0:
-                continue
-            node_id = node_ids[idx]
-            node_type = node_types[idx]
-            activation = activation_functions[node_activations[idx]]
-            if node_type in (2, 3):  # output or hidden node
-                # Get incoming connections
-                parents = jnp.where(adj_matrix[:, node_id] != 0)[0]
-                weights = adj_matrix[parents, node_id]
-                inputs = result[parents]
-                # Apply activation function
-                result = result.at[node_id].set(activation(jnp.dot(weights, inputs)))
-
-        output_mask = node_ids[node_types == 2]
-        output = result[output_mask]
-        return output
+    def __call__(self, *args, **kwargs):
+        return self.predict(*args, **kwargs)
 
     def __str__(self):
         return f"Individual(fitness={self.fitness}, rank={self.rank}, generation={self.generation}, specie={self.specie})"

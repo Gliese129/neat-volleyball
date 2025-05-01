@@ -7,7 +7,7 @@ from tqdm import tqdm
 from score import score
 
 p = HyperParams(
-    population_size=100,
+    population_size=3,
     max_generations=10, # for testing
 )
 
