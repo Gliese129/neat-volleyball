@@ -7,7 +7,7 @@ from tqdm import tqdm
 from score import score
 
 p = HyperParams(
-    population_size=3,
+    population_size=50,
     max_generations=10, # for testing
 )
 
@@ -18,6 +18,7 @@ log_times = 2
 
 def train():
     key = random.PRNGKey(0)
+    best_individual = None
     for generation in tqdm(range(p.max_generations)):
         print(f"Generation: {generation}")
         key, subkey = random.split(key)
@@ -33,6 +34,9 @@ def train():
         print(f"scoring done for generation {generation}")
         print(f"Scores: {scores}")
         neat.tell(scores)
+        # Save the best individual
+        if best_individual is None or neat.population[0].fitness > best_individual.fitness:
+            best_individual = neat.population[0]
         # record
         if generation % log_times == 0:
             # Save the population
@@ -44,7 +48,7 @@ def train():
                 json.dump(neat.population[0].to_json(), f, indent=4)
 
     with open(f"{output_folder}/best.json", "w") as f:
-        json.dump(neat.population[0].to_json(), f, indent=4)
+        json.dump(best_individual[0].to_json(), f, indent=4)
 
 
 if __name__ == '__main__':

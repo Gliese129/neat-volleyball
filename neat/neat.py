@@ -53,6 +53,7 @@ class Neat:
         """
         for i, individual in enumerate(self.population):
             individual.fitness = rewards[i].item()
+        self.population = sorted(self.population, key=lambda x: x.fitness, reverse=True)
 
     def ask(self):
         """

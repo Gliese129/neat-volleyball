@@ -66,6 +66,10 @@ def score_batch(
             "SlimeVolley-v0",
             num_envs=n_agents,
             vectorization_mode="async",
+            render_mode="state",
+            config={
+                'survival_reward': True,
+            }
         )
         key, subkey = random.split(key)
         obs, _ = envs.reset(seed=random.randint(shape=(1,), key=subkey, minval=0, maxval=10000).item())
@@ -74,7 +78,7 @@ def score_batch(
         right_rewards = jnp.zeros(n_agents, dtype=jnp.float32)
         done = jnp.zeros(n_agents, dtype=jnp.bool_)
 
-        while not done.all() and steps < 30000:
+        while not done.all() and steps < 5000:
             obs_left, obs_right = obs["agent_left"]['obs'], obs["agent_right"]['obs']
             action = {
                 "agent_left": jnp.stack([batch[k][0](obs_left[k])  for k in range(n_agents)]),
