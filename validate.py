@@ -70,7 +70,7 @@ if __name__ == "__main__":
     # policy = BaselinePolicy()  # defaults to use RNN Baseline for player
 
     env = SlimeVolleyEnv(
-        {"survival_reward": True, "human_actions": False}
+        {"survival_reward": True, "human_actions": True}
     )
 
     if constants.RENDER_MODE:
@@ -82,8 +82,8 @@ if __name__ == "__main__":
     obs, _ = env.reset(seed=np.random.randint(0, 10000))
     steps = 0
 
-    terminateds = truncateds = {"__all__": False}
-    while not terminateds["__all__"] and not truncateds["__all__"]:
+    terminateds = truncateds = False
+    while not terminateds and not truncateds:
         obs_right, obs_left = obs["agent_right"]['obs'], obs["agent_left"]['obs']
 
         right_action = manualAction
@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
         if constants.RENDER_MODE:
             env.render()
-            # sleep(0.01)
+            sleep(0.01)
 
         # make the game go slower for human players to be fair to humans.
         # if manualMode or otherManualMode:
