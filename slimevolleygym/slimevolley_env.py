@@ -70,7 +70,7 @@ class SlimeVolleyEnv(gym.Env):
     """
 
     metadata = {
-        "render.modes": ["human", "rgb_array", "state"],
+        "render_modes": ["human", "rgb_array", "state"],
         "video.frames_per_second": 50,
     }
 
@@ -85,7 +85,7 @@ class SlimeVolleyEnv(gym.Env):
 
     default_config = {
         "from_pixels": False,
-        "survival_reward": True,
+        "survival_reward": False,
         "max_steps": 3000,
         # if true, LHS actions are swapped to be intuitive for humans, otherwise directions are swapped
         "human_inputs": False,

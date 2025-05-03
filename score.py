@@ -11,36 +11,36 @@ from slimevolleygym.slimevolley_env import SlimeVolleyEnv
 
 frame_skip = 4
 
-
-def score_one(left_agent: BasePolicy, right_agent: BasePolicy, key: jnp.ndarray):
-    env = SlimeVolleyEnv({
-        'survival_reward': True,
-        'human_actions': False,
-    })
-
-    key, subkey = random.split(key)
-    seed = int(jax.device_get(random.randint(shape=(), key=subkey, minval=0, maxval=10000)))
-    obs, _ = env.reset(seed=seed)
-    steps = 0
-    total_reward = {"agent_right": 0, "agent_left": 0}
-
-    terminateds = truncateds = {"__all__": False}
-    while not terminateds["__all__"] and not truncateds["__all__"] and steps < 3000:
-        obs_left, obs_right = obs["agent_left"]['obs'], obs["agent_right"]['obs']
-        action = {
-            "agent_left": left_agent(obs_left),
-            "agent_right": right_agent(obs_right),
-        }
-        for _ in range(frame_skip):
-            obs, reward, terminateds, truncateds, _ = env.step(action)
-            total_reward["agent_left"] += reward["agent_left"]
-            total_reward["agent_right"] += reward["agent_right"]
-            steps += 1
-            if terminateds["__all__"] or truncateds["__all__"]:
-                break
-    env.close()
-    return total_reward["agent_left"], total_reward["agent_right"]
-
+#
+# def score_one(left_agent: BasePolicy, right_agent: BasePolicy, key: jnp.ndarray):
+#     env = SlimeVolleyEnv({
+#         'survival_reward': True,
+#         'human_actions': False,
+#     })
+#
+#     key, subkey = random.split(key)
+#     seed = int(jax.device_get(random.randint(shape=(), key=subkey, minval=0, maxval=10000)))
+#     obs, _ = env.reset(seed=seed)
+#     steps = 0
+#     total_reward = {"agent_right": 0, "agent_left": 0}
+#
+#     terminateds = truncateds = {"__all__": False}
+#     while not terminateds["__all__"] and not truncateds["__all__"] and steps < 3000:
+#         obs_left, obs_right = obs["agent_left"]['obs'], obs["agent_right"]['obs']
+#         action = {
+#             "agent_left": left_agent(obs_left),
+#             "agent_right": right_agent(obs_right),
+#         }
+#         for _ in range(frame_skip):
+#             obs, reward, terminateds, truncateds, _ = env.step(action)
+#             total_reward["agent_left"] += reward["agent_left"]
+#             total_reward["agent_right"] += reward["agent_right"]
+#             steps += 1
+#             if terminateds["__all__"] or truncateds["__all__"]:
+#                 break
+#     env.close()
+#     return total_reward["agent_left"], total_reward["agent_right"]
+#
 
 def score_batch(
     agents: list[tuple[BasePolicy, BasePolicy]],
@@ -68,32 +68,33 @@ def score_batch(
             vectorization_mode="async",
             render_mode="state",
             config={
-                'survival_reward': True,
+                'survival_reward': False,
             }
         )
         key, subkey = random.split(key)
         obs, _ = envs.reset(seed=random.randint(shape=(1,), key=subkey, minval=0, maxval=10000).item())
-        steps = 0
+        steps = jnp.zeros(n_agents, dtype=jnp.int32)
         left_rewards = jnp.zeros(n_agents, dtype=jnp.float32)
         right_rewards = jnp.zeros(n_agents, dtype=jnp.float32)
         done = jnp.zeros(n_agents, dtype=jnp.bool_)
 
-        while not done.all() and steps < 5000:
+        while not done.all() and any(steps < 3000):
             obs_left, obs_right = obs["agent_left"]['obs'], obs["agent_right"]['obs']
             action = {
                 "agent_left": jnp.stack([batch[k][0](obs_left[k])  for k in range(n_agents)]),
                 "agent_right": jnp.stack([batch[k][1](obs_right[k]) for k in range(n_agents)])
             }
             obs, rewards, terminateds, truncateds, _ = envs.step(action)
+            left_rewards -= rewards
             right_rewards += rewards
             done = done | terminateds
-            steps += 1
+            steps = steps.at[jnp.bitwise_not(done)].set(steps[jnp.bitwise_not(done)] + 1)
         envs.close()
 
         start = i * batch_size
         end = min((i + 1) * batch_size, len(agents))
-        scores = scores.at[start:end, 0].set(left_rewards)
-        scores = scores.at[start:end, 1].set(right_rewards)
+        scores = scores.at[start:end, 0].set(left_rewards + steps * 0.01)
+        scores = scores.at[start:end, 1].set(right_rewards + steps * 0.01)
 
     return scores #! only right agent score
 
