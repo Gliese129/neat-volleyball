@@ -39,7 +39,6 @@ if __name__ == "__main__":
     )  # forward, backward, jump
     otherManualAction = [0, 0, 0]
     manualMode = True
-    otherManualMode = False
 
     # taken from https://github.com/openai/gym/blob/master/gym/envs/box2d/car_racing.py
     def key_press(k, mod):
@@ -86,8 +85,11 @@ if __name__ == "__main__":
     while not terminateds and not truncateds:
         obs_right, obs_left = obs["agent_right"]['obs'], obs["agent_left"]['obs']
 
-        right_action = manualAction
-        left_action = ai_policy.get_action(obs_right)
+
+        left_action = ai_policy.get_action(obs_left)
+        right_action = ai_policy.get_action(obs_right)
+        if manualMode:
+            right_action = manualAction
 
         actions = {"agent_left": left_action, "agent_right": right_action}
         obs, reward, terminateds, truncateds, _ = env.step(actions)
@@ -99,10 +101,10 @@ if __name__ == "__main__":
             sleep(0.01)
 
         # make the game go slower for human players to be fair to humans.
-        # if manualMode or otherManualMode:
-        #     if constants.PIXEL_MODE:
-        #         sleep(0.01)
-        #     else:
-        #         sleep(0.02)
+        if manualMode:
+            if constants.PIXEL_MODE:
+                sleep(0.01)
+            else:
+                sleep(0.02)
 
     env.close()
