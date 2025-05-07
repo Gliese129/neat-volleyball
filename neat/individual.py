@@ -298,7 +298,7 @@ class Individual:
 
         return dist.item()
 
-    def express(self, force_recompile: bool = False) -> None:
+    def express(self, force_recompile: bool = False):
         """
         Compile individual node forward path once
         :return:
@@ -367,8 +367,9 @@ class Individual:
             values, _ = jax.lax.scan(body, values, jnp.arange(order.size))
             return values[out_idx]  # shape [output_size]
 
-        # self.compiled_forward = jax.jit(_forward)  # compiled function
-        self.compiled_forward = _forward  # compiled function
+        self.compiled_forward = jax.jit(_forward)  # compiled function
+        return None
+        # self.compiled_forward = _forward  # compiled function
 
     def predict(self, inputs: jnp.ndarray) -> jnp.ndarray:
         """

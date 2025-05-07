@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 
 from neat import Individual
@@ -8,7 +10,7 @@ from slimevolleygym.slimevolley_boost_env import SlimeVolleyBoostEnv
 
 # from slime_volleyball.baseline_policy import BaselinePolicy
 
-agent_path = './output/best.json'
+agent_path = './output/best_8.json'
 
 with open(agent_path, 'r') as f:
     model = Individual.from_json(f.read())
@@ -38,7 +40,7 @@ if __name__ == "__main__":
         [0, 0, 0]
     )  # forward, backward, jump
     otherManualAction = [0, 0, 0]
-    manualMode = True
+    manualMode = False
 
     # taken from https://github.com/openai/gym/blob/master/gym/envs/box2d/car_racing.py
     def key_press(k, mod):
@@ -85,11 +87,11 @@ if __name__ == "__main__":
     while not terminateds and not truncateds:
         obs_right, obs_left = obs["agent_right"]['obs'], obs["agent_left"]['obs']
 
-
         left_action = ai_policy.get_action(obs_left)
         right_action = ai_policy.get_action(obs_right)
         if manualMode:
             right_action = manualAction
+
 
         actions = {"agent_left": left_action, "agent_right": right_action}
         obs, reward, terminateds, truncateds, _ = env.step(actions)
@@ -108,3 +110,4 @@ if __name__ == "__main__":
                 sleep(0.02)
 
     env.close()
+    print(f"Game ended after {steps} steps")

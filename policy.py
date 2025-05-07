@@ -10,6 +10,7 @@ class BasePolicy(ABC):
 
     def __init__(self, model: Individual):
         self.model = model
+        self.action_threshold = jnp.array(self.action_threshold)
 
     def get_action(self, obs: list[float]) -> list[int]:
         """
@@ -19,10 +20,7 @@ class BasePolicy(ABC):
         """
         obs = jnp.array(obs)
         action = self.model.predict(obs)
-        action = action.tolist()
-        return [
-            1 if action[i] > self.action_threshold[i] else 0 for i in range(len(action))
-        ]
+        return (action > self.action_threshold).astype(jnp.int32).tolist()
 
     def get_forward_function(self):
         self.model.express()
