@@ -48,7 +48,7 @@ def train():
                 json.dump(neat.population[0].to_json(), f, indent=4)
 
     with open(f"{output_folder}/best.json", "w") as f:
-        json.dump(best_individual[0].to_json(), f, indent=4)
+        json.dump(best_individual.to_json(), f, indent=4)
 
 
 if __name__ == '__main__':
