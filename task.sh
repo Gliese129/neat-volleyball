@@ -16,4 +16,4 @@ cd "$WDIR"/neat-volleyball || exit
 eval "$(conda shell.bash hook)"
 conda activate ai
 
-python train.py -p 200 -g 50
+python train.py -p 200 -g 50 --sample_num 10

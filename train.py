@@ -19,14 +19,13 @@ p = HyperParams(
 neat: Neat = None
 output_folder = "output"
 log_times = 1
+sample_num = 5
 
 def setup():
     global neat, output_folder, log_times
     neat = Neat(p)
-    output_folder = "output"
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
-    log_times = 1
 
 
 def train():
@@ -40,7 +39,7 @@ def train():
         scores = score(
             agents=neat.population,
             key=subkey,
-            sample_num=2,
+            sample_num=sample_num,
             score_method="reward",
         )
         # scores = jnp.ones(len(neat.population))
@@ -72,12 +71,14 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--max_generations', type=int, default=10)
     parser.add_argument('--output', type=str, default='output')
     parser.add_argument('--log_times', type=int, default=1)
+    parser.add_argument('--sample_num', type=int, default=5)
 
     args = parser.parse_args()
     p.population_size = args.population_size
     p.max_generations = args.max_generations
     output_folder = args.output
     log_times = args.log_times
+    sample_num = args.sample_num
 
     setup()
     train()
