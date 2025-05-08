@@ -15,11 +15,18 @@ p = HyperParams(
     max_generations=10, # for testing
 )
 
-neat = Neat(p)
+
+neat: Neat = None
 output_folder = "output"
-if not os.path.exists(output_folder):
-    os.makedirs(output_folder)
 log_times = 1
+
+def setup():
+    global neat, output_folder, log_times
+    neat = Neat(p)
+    output_folder = "output"
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+    log_times = 1
 
 
 def train():
@@ -72,4 +79,5 @@ if __name__ == '__main__':
     output_folder = args.output
     log_times = args.log_times
 
+    setup()
     train()

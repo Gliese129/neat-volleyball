@@ -11,7 +11,7 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export PYTHONMULTIPROCESSING_START_METHOD=spawn
 
 WDIR=`pwd`   #获取当前目录
-cd $WDIR/neat-volleyball
+cd "$WDIR"/neat-volleyball || exit
 
 eval "$(conda shell.bash hook)"
 conda activate ai
