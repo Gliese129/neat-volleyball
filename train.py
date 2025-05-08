@@ -1,7 +1,9 @@
 import multiprocessing as mp
+
 mp.set_start_method("spawn", force=True)
 
 import json
+import os
 from neat import Neat, HyperParams
 import jax.numpy as jnp
 from jax import random
@@ -15,6 +17,8 @@ p = HyperParams(
 
 neat = Neat(p)
 output_folder = "output"
+if not os.path.exists(output_folder):
+    os.makedirs(output_folder)
 log_times = 1
 
 
