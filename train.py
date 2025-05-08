@@ -1,5 +1,7 @@
-import json
+import multiprocessing as mp
+mp.set_start_method("spawn", force=True)
 
+import json
 from neat import Neat, HyperParams
 import jax.numpy as jnp
 from jax import random
@@ -13,7 +15,7 @@ p = HyperParams(
 
 neat = Neat(p)
 output_folder = "output"
-log_times = 2
+log_times = 1
 
 
 def train():
@@ -52,4 +54,18 @@ def train():
 
 
 if __name__ == '__main__':
+    # params: -p population_size -g max_generations --output output_folder --log_times log_times
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-p', '--population_size', type=int, default=50)
+    parser.add_argument('-g', '--max_generations', type=int, default=10)
+    parser.add_argument('--output', type=str, default='output')
+    parser.add_argument('--log_times', type=int, default=1)
+
+    args = parser.parse_args()
+    p.population_size = args.population_size
+    p.max_generations = args.max_generations
+    output_folder = args.output
+    log_times = args.log_times
+
     train()

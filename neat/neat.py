@@ -206,6 +206,7 @@ class Neat:
             "innovation_record": self.innovation_record.tolist(),
             "species_threshold": self.species_threshold,
             "p": self.p.to_json(),
+            "_id_counter": Individual._id_counter,
         }
 
     @classmethod
@@ -221,4 +222,6 @@ class Neat:
         neat.innovation_record = jnp.array(data["innovation_record"])
         neat.population = [Individual.from_json(ind) for ind in data["population"]]
         neat.species = [Specie.from_json(specie) for specie in data["species"]]
+
+        Individual._id_counter = data["_id_counter"]
         return neat

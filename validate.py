@@ -1,3 +1,5 @@
+import select
+import sys
 import time
 
 import numpy as np
@@ -10,7 +12,7 @@ from slimevolleygym.slimevolley_boost_env import SlimeVolleyBoostEnv
 
 # from slime_volleyball.baseline_policy import BaselinePolicy
 
-agent_path = './output/best_8.json'
+agent_path = './output/best.json'
 
 with open(agent_path, 'r') as f:
     model = Individual.from_json(f.read())
@@ -79,35 +81,46 @@ if __name__ == "__main__":
         env.viewer.window.on_key_press = key_press
         env.viewer.window.on_key_release = key_release
 
-    # start the game
-    obs, _ = env.reset(seed=np.random.randint(0, 10000))
-    steps = 0
+    while True:
+        # start the game
+        obs, _ = env.reset(seed=np.random.randint(0, 10000))
+        steps = 0
 
-    terminateds = truncateds = False
-    while not terminateds and not truncateds:
-        obs_right, obs_left = obs["agent_right"]['obs'], obs["agent_left"]['obs']
+        terminateds = truncateds = False
+        manualMode = False
 
-        left_action = ai_policy.get_action(obs_left)
-        right_action = ai_policy.get_action(obs_right)
-        if manualMode:
-            right_action = manualAction
+        while not terminateds and not truncateds:
+            obs_right, obs_left = obs["agent_right"]['obs'], obs["agent_left"]['obs']
+
+            left_action = ai_policy.get_action(obs_left)
+            right_action = ai_policy.get_action(obs_right)
+            if manualMode:
+                right_action = manualAction
 
 
-        actions = {"agent_left": left_action, "agent_right": right_action}
-        obs, reward, terminateds, truncateds, _ = env.step(actions)
+            actions = {"agent_left": left_action, "agent_right": right_action}
+            obs, reward, terminateds, truncateds, _ = env.step(actions)
 
-        steps += 1
+            steps += 1
 
-        if constants.RENDER_MODE:
-            env.render()
-            sleep(0.01)
-
-        # make the game go slower for human players to be fair to humans.
-        if manualMode:
-            if constants.PIXEL_MODE:
+            if constants.RENDER_MODE:
+                env.render()
                 sleep(0.01)
-            else:
-                sleep(0.02)
+
+            # make the game go slower for human players to be fair to humans.
+            if manualMode:
+                if constants.PIXEL_MODE:
+                    sleep(0.01)
+                else:
+                    sleep(0.02)
+        print(f"Game ended after {steps} steps")
+        #
+        print("Press q to exit, any other key to continue (waiting 1 second): ")
+        rlist, _, _ = select.select([sys.stdin], [], [], 1)
+        if rlist:
+            if_exit = sys.stdin.read(1).strip()
+            if if_exit == "q":
+                manualMode = False
+                break
 
     env.close()
-    print(f"Game ended after {steps} steps")

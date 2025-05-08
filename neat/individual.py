@@ -22,12 +22,19 @@ class Individual:
         rank: rank of individual (int)
         generation: generation number (int)
         specie: species id (int)
+        id: individual id (int) ; for logging
+        parents_id: list of parents id (list[int]) ; for logging
     """
     fitness: float
     rank: int
     generation: int
     specie: int
     compiled_forward: callable
+
+    id: int
+    parents_id: list[int] = []
+
+    _id_counter = 0
 
     def __init__(self, nodes: jnp.ndarray, genes: jnp.ndarray):
         """ Initialize individual with given genes
@@ -48,6 +55,9 @@ class Individual:
         """
         self.nodes = nodes
         self.genes = genes
+
+        self.id = Individual._id_counter
+        Individual._id_counter += 1
 
     @property
     def conn_cnt(self) -> int:
@@ -109,8 +119,10 @@ class Individual:
         assert innovation_record is not None, "innovation_record is None"
         if other is None:
             child = Individual(self.nodes.copy(), self.genes.copy())
+            child.parent_ids = [self.id]
         else:
             child = self._crossover(other, key)
+            child.parent_ids = [self.id, other.id]
 
         innovation_record_ =child._mutate(p, innovation_record, key)
         child.generation = generation
@@ -399,6 +411,8 @@ class Individual:
             "rank": self.rank if hasattr(self, "rank") else -1,
             "generation": self.generation,
             "specie": self.specie if hasattr(self, "specie") else -1,
+            "id": self.id,
+            "parents_id": self.parents_id if hasattr(self, "parents_id") else [],
         }
 
     @classmethod
@@ -420,4 +434,8 @@ class Individual:
         individual.rank = rank
         individual.generation = generation
         individual.specie = specie
+        if hasattr(data, "id"):
+            individual.id = data["id"]
+        if hasattr(data, "parents_id"):
+            individual.parents_id = data["parents_id"]
         return individual
