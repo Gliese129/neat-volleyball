@@ -96,13 +96,13 @@ def score_batch(
         scores = scores.at[start:end, 0].set(left_rewards + steps * 0.01)
         scores = scores.at[start:end, 1].set(right_rewards + steps * 0.01)
 
-    return scores #! only right agent score
+    return scores
 
 
 def score(
     agents: list[Individual],
     key: jnp.ndarray,
-    sample_num: int = 2,
+    sample_num: int = 10,
     score_method: str = "reward",
 ) -> jnp.ndarray:
     assert len(agents) > 0, "No agents to score."
@@ -126,11 +126,12 @@ def score(
 
     scores = jnp.zeros((len(agents),), dtype=jnp.float32)
     counts = jnp.zeros_like(scores)
-    points = jnp.zeros_like(scores)
 
     for k, (i, j) in enumerate(batches):
-        _, right_score = results[k]
+        left_score, right_score = results[k]
+        scores = scores.at[i].add(left_score)
         scores = scores.at[j].add(right_score)
+        counts = counts.at[i].add(1)
         counts = counts.at[j].add(1)
 
 
