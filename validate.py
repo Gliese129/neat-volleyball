@@ -12,7 +12,7 @@ from slimevolleygym.slimevolley_boost_env import SlimeVolleyBoostEnv
 
 # from slime_volleyball.baseline_policy import BaselinePolicy
 
-agent_path = './output/best_49.json'
+agent_path = './output/best.json'
 
 with open(agent_path, 'r') as f:
     model = Individual.from_json(f.read())
@@ -115,12 +115,12 @@ if __name__ == "__main__":
                     sleep(0.02)
         print(f"Game ended after {steps} steps")
         #
-        # print("Press q to exit, any other key to continue (waiting 1 second): ")
-        # rlist, _, _ = select.select([sys.stdin], [], [], 1)
-        # if rlist:
-        #     if_exit = sys.stdin.read(1).strip()
-        #     if if_exit == "q":
-        #         manualMode = False
-        #         break
+        print("Press q to exit, any other key to continue (waiting 1 second): ")
+        rlist, _, _ = select.select([sys.stdin], [], [], 1)
+        if rlist:
+            if_exit = sys.stdin.read(1).strip()
+            if if_exit == "q":
+                manualMode = False
+                break
 
     env.close()

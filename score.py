@@ -118,8 +118,12 @@ def score(
 
     for i in range(len(agents)):
         right_ids = random.choice(sample_keys[i], len(agents), shape=(sample_num,), replace=False)
+        if_switch = random.uniform(sample_keys[i], shape=(len(agents),), minval=0, maxval=1) < 0.5
         for j in right_ids:
-            batches.append((i, int(j)))
+            if if_switch[j]:
+                batches.append((int(j), i))
+            else:
+                batches.append((i, int(j)))
 
     match_pairs = [(agents[i].get_forward_function(), agents[j].get_forward_function()) for i, j in batches]
     results = score_batch(match_pairs, key=key)
