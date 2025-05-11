@@ -75,6 +75,8 @@ def score(
     assert len(agents) > 0, "No agents to score."
     assert sample_num > 0, "Sample num must be greater than 0."
     agents = [BasePolicy(agent) for agent in agents]
+    if extra_agents is not None:
+        extra_agents = [BasePolicy(agent) for agent in extra_agents]
     agent_num = len(agents)
 
     if len(agents) < sample_num:
