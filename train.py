@@ -20,6 +20,8 @@ neat: Neat = None
 output_folder = "output"
 log_times = 1
 sample_num = 5
+fame_num = 5
+fame_agents = []
 
 def setup():
     global neat, output_folder, log_times
@@ -40,12 +42,20 @@ def train():
             key=subkey,
             sample_num=sample_num,
             score_method="reward",
+            extra_agents=fame_agents
         )
         # scores = jnp.ones(len(neat.population))
         neat.tell(scores)
         # Save the best individual
         if best_individual is None or neat.population[0].fitness > best_individual.fitness:
             best_individual = neat.population[0]
+        if len(fame_agents) < fame_num:
+            fame_agents.append(best_individual)
+        else:
+            # Replace the worst agent in fame_agents with the best one
+            if best_individual.fitness > fame_agents[-1].fitness:
+                fame_agents[-1] = best_individual
+                fame_agents.sort(key=lambda x: x.fitness, reverse=True)
         # record
         print(f"Best fitness: {best_individual.fitness}")
         if generation % log_times == 0:
