@@ -7,8 +7,7 @@ from jax import random
 
 from neat import Individual
 from policy import BasePolicy
-from slimevolleygym.slimevolley_env import SlimeVolleyEnv
-
+from slimevolleygym import slimevolley_env
 
 def score_batch(
     agents: list[tuple[BasePolicy, BasePolicy]],
@@ -76,11 +75,15 @@ def score(
     agents: list[Individual],
     key: jnp.ndarray,
     sample_num: int = 10,
+    extra_agents=None,
     score_method: str = "reward",
 ) -> jnp.ndarray:
     assert len(agents) > 0, "No agents to score."
     assert sample_num > 0, "Sample num must be greater than 0."
     agents = [BasePolicy(agent) for agent in agents]
+    if extra_agents is not None:
+        extra_agents = [BasePolicy(agent) for agent in extra_agents]
+    agent_num = len(agents)
 
     if len(agents) < sample_num:
         sample_num = len(agents)
@@ -92,13 +95,28 @@ def score(
     for i in range(len(agents)):
         right_ids = random.choice(sample_keys[i], len(agents), shape=(sample_num,), replace=False)
         if_switch = random.uniform(sample_keys[i], shape=(len(agents),), minval=0, maxval=1) < 0.5
+        if extra_agents:
+            replace_num =random.randint(sample_keys[i], (1, ), minval=0, maxval=min(len(extra_agents), sample_num)).item()
+            extra_ids = random.choice(sample_keys[i], len(extra_agents), shape=(replace_num,), replace=False)
+            right_ids = right_ids.at[extra_ids].set(extra_ids + agent_num)
+
         for j in right_ids:
             if if_switch[j]:
                 batches.append((int(j), i))
             else:
                 batches.append((i, int(j)))
 
-    match_pairs = [(agents[i].get_forward_function(), agents[j].get_forward_function()) for i, j in batches]
+    match_pairs = []
+    for i, j in batches:
+        if i >= agent_num:
+            left = extra_agents[i - agent_num]
+        else:
+            left = agents[i]
+        if j >= agent_num:
+            right = extra_agents[j - agent_num]
+        else:
+            right = agents[j]
+        match_pairs.append((left.get_forward_function(), right.get_forward_function()))
     results = score_batch(match_pairs, key=key)
 
     scores = jnp.zeros((len(agents),), dtype=jnp.float32)
@@ -106,10 +124,13 @@ def score(
 
     for k, (i, j) in enumerate(batches):
         left_score, right_score = results[k]
-        scores = scores.at[i].add(left_score)
-        scores = scores.at[j].add(right_score)
-        counts = counts.at[i].add(1)
-        counts = counts.at[j].add(1)
+        if i < agent_num:
+            scores = scores.at[i].add(left_score)
+            counts = counts.at[i].add(1)
+        if j < agent_num:
+            scores = scores.at[j].add(right_score)
+            counts = counts.at[j].add(1)
+
 
     # Avoid division by 0
     counts = jnp.where(counts == 0, 1, counts)
