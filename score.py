@@ -9,38 +9,6 @@ from neat import Individual
 from policy import BasePolicy
 from slimevolleygym.slimevolley_env import SlimeVolleyEnv
 
-frame_skip = 4
-
-#
-# def score_one(left_agent: BasePolicy, right_agent: BasePolicy, key: jnp.ndarray):
-#     env = SlimeVolleyEnv({
-#         'survival_reward': True,
-#         'human_actions': False,
-#     })
-#
-#     key, subkey = random.split(key)
-#     seed = int(jax.device_get(random.randint(shape=(), key=subkey, minval=0, maxval=10000)))
-#     obs, _ = env.reset(seed=seed)
-#     steps = 0
-#     total_reward = {"agent_right": 0, "agent_left": 0}
-#
-#     terminateds = truncateds = {"__all__": False}
-#     while not terminateds["__all__"] and not truncateds["__all__"] and steps < 3000:
-#         obs_left, obs_right = obs["agent_left"]['obs'], obs["agent_right"]['obs']
-#         action = {
-#             "agent_left": left_agent(obs_left),
-#             "agent_right": right_agent(obs_right),
-#         }
-#         for _ in range(frame_skip):
-#             obs, reward, terminateds, truncateds, _ = env.step(action)
-#             total_reward["agent_left"] += reward["agent_left"]
-#             total_reward["agent_right"] += reward["agent_right"]
-#             steps += 1
-#             if terminateds["__all__"] or truncateds["__all__"]:
-#                 break
-#     env.close()
-#     return total_reward["agent_left"], total_reward["agent_right"]
-#
 
 def score_batch(
     agents: list[tuple[BasePolicy, BasePolicy]],
@@ -80,10 +48,15 @@ def score_batch(
 
         while not done.all() and any(steps < 3000):
             obs_left, obs_right = obs["agent_left"]['obs'], obs["agent_right"]['obs']
+
+            action_left = jnp.stack([batch[k][0](obs_left[k]) for k in range(n_agents)])
+            action_right = jnp.stack([batch[k][1](obs_right[k]) for k in range(n_agents)])
+            action_threshold = jnp.array(BasePolicy.action_threshold)
             action = {
-                "agent_left": jnp.stack([batch[k][0](obs_left[k])  for k in range(n_agents)]),
-                "agent_right": jnp.stack([batch[k][1](obs_right[k]) for k in range(n_agents)])
+                "agent_left": (action_left > action_threshold).astype(jnp.int32),
+                "agent_right": (action_right > action_threshold).astype(jnp.int32),
             }
+
             obs, rewards, terminateds, truncateds, _ = envs.step(action)
             left_rewards -= rewards
             right_rewards += rewards
@@ -137,7 +110,6 @@ def score(
         scores = scores.at[j].add(right_score)
         counts = counts.at[i].add(1)
         counts = counts.at[j].add(1)
-
 
     # Avoid division by 0
     counts = jnp.where(counts == 0, 1, counts)
