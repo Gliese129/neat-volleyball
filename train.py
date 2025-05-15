@@ -19,8 +19,11 @@ p = HyperParams(
 neat: Neat = None
 output_folder = "output"
 log_times = 1
-sample_num = 5
-fame_num = 5
+
+sample_num = (3, 7)
+sample_divide = 0.4
+
+fame_num = 2
 fame_agents = []
 
 def setup():
@@ -33,6 +36,7 @@ def setup():
 def train():
     key = random.PRNGKey(0)
     best_individual = None
+    sample_change_turn = int(p.max_generations * sample_divide)
     for generation in tqdm(range(p.max_generations)):
         print(f"Running generation: {generation}")
         key, subkey = random.split(key)
@@ -40,7 +44,7 @@ def train():
         scores = score(
             agents=neat.population,
             key=subkey,
-            sample_num=sample_num,
+            sample_num=sample_num[0] if generation < sample_change_turn else sample_num[1],
             score_method="reward",
             extra_agents=fame_agents
         )
@@ -78,14 +82,12 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--max_generations', type=int, default=10)
     parser.add_argument('--output', type=str, default='output')
     parser.add_argument('--log_times', type=int, default=1)
-    parser.add_argument('--sample_num', type=int, default=5)
 
     args = parser.parse_args()
     p.population_size = args.population_size
     p.max_generations = args.max_generations
     output_folder = args.output
     log_times = args.log_times
-    sample_num = args.sample_num
 
     setup()
     train()

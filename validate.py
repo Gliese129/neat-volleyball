@@ -12,7 +12,11 @@ from slimevolleygym.slimevolley_boost_env import SlimeVolleyBoostEnv
 
 # from slime_volleyball.baseline_policy import BaselinePolicy
 
-agent_path = './output/best_49.json'
+generation = input("Enter generation number (default None): ")
+if generation == "":
+    agent_path = './output/best.json'
+else:
+    agent_path = f'./output/best_{generation}.json'
 
 with open(agent_path, 'r') as f:
     model = Individual.from_json(f.read())
